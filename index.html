@@ -4,9 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>my'voc</title>
+
+<!--
+╔══════════════════════════════════════════════════╗
+║  my'voc — v1.9.0                                 ║
+║  Appel vidéo P2P chiffré de bout en bout         ║
+║                                                  ║
+║  PRINCIPE DU CODE UNIQUE :                       ║
+║  Au lieu d'échanger des blocs de texte SDP       ║
+║  bruts, on les compresse et encode en base64     ║
+║  pour obtenir un code court (~200 car max).      ║
+║                                                  ║
+║  ÉTAPES :                                        ║
+║  1. A crée → copie le CODE OFFRE → envoie à B   ║
+║  2. B colle le code → copie le CODE RETOUR → A  ║
+║  3. A colle le code retour → appel connecté ✅   ║
+╚══════════════════════════════════════════════════╝
+-->
+
 <style>
+/* ── RESET ──────────────────────────────────────────────────
+   Supprime les marges/paddings par défaut du navigateur.
+   box-sizing:border-box = la largeur inclut le padding.     */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── BODY ───────────────────────────────────────────────────
+   Fond noir, texte blanc, police système (rapide à charger). */
 body {
   background: #0d0d0d;
   color: #fff;
@@ -14,103 +37,106 @@ body {
   min-height: 100vh;
 }
 
-/* ── SCREENS ── */
-#sh { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 32px 24px; gap: 48px; }
+/* ── 3 ÉCRANS PRINCIPAUX ────────────────────────────────────
+   #sh = home (accueil)
+   #sw = waiting (en attente de connexion)
+   #sc = call (appel en cours)
+   Un seul est visible à la fois via la fonction show().     */
+#sh {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh; padding: 32px 24px; gap: 48px;
+}
 #sw { display: none; padding: 24px; }
 #sc { display: none; }
+
+/* Classe utilitaire pour cacher un élément */
 .hidden { display: none !important; }
 
-/* ── HOME ── */
-.logo {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-}
-.logo-name {
-  font-size: 36px; font-weight: 700; letter-spacing: -1px;
-  color: #fff;
-}
-.logo-name span { color: #555; }
+/* ── LOGO ───────────────────────────────────────────────── */
+.logo { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.logo-name { font-size: 36px; font-weight: 700; letter-spacing: -1px; }
+.logo-name span { color: #555; } /* apostrophe grisée */
 .logo-sub { font-size: 12px; color: #444; letter-spacing: 2px; text-transform: uppercase; }
+.home-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 280px; }
 
-.home-actions {
-  display: flex; flex-direction: column; gap: 10px;
-  width: 100%; max-width: 280px;
-}
-
-/* ── BUTTONS ── */
+/* ── BOUTONS ────────────────────────────────────────────────
+   .btn-w = blanc  → action principale
+   .btn-g = gris   → action secondaire
+   -webkit-tap-highlight-color:transparent = supprime le
+   flash bleu/gris au tap sur Android/iOS.                  */
 .btn {
-  width: 100%; padding: 15px;
-  border-radius: 8px; border: none;
-  font-size: 15px; font-weight: 500;
-  cursor: pointer;
+  width: 100%; padding: 15px; border-radius: 8px; border: none;
+  font-size: 15px; font-weight: 500; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: opacity .12s;
-  letter-spacing: .2px;
 }
 .btn:active { opacity: .65; }
+.btn-w  { background: #fff; color: #0d0d0d; }
+.btn-g  { background: #1a1a1a; color: #fff; border: 1px solid #2a2a2a; }
+.btn-sm { width: auto; padding: 9px 16px; font-size: 13px; }
 
-.btn-w   { background: #fff; color: #0d0d0d; }
-.btn-g   { background: #1a1a1a; color: #fff; border: 1px solid #2a2a2a; }
-.btn-r   { background: #c0392b; color: #fff; }
-.btn-sm  { width: auto; padding: 9px 16px; font-size: 13px; }
-
-/* ── MODAL ── */
+/* ── MODALES ────────────────────────────────────────────────
+   Fenêtres superposées. .overlay = fond noir transparent.
+   .modal = boîte centrale. opacity+pointer-events = animation
+   d'apparition sans JS supplémentaire.                      */
 .overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.85);
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
   display: flex; align-items: center; justify-content: center;
-  padding: 24px; z-index: 100;
-  opacity: 0; pointer-events: none; transition: opacity .18s;
+  padding: 20px; z-index: 100;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .overlay.show { opacity: 1; pointer-events: all; }
 .modal {
-  background: #111; border: 1px solid #222;
-  border-radius: 14px; padding: 28px;
-  width: 100%; max-width: 340px;
-  display: flex; flex-direction: column; gap: 18px;
-  transform: translateY(12px); transition: transform .18s;
+  background: #111; border: 1px solid #222; border-radius: 14px;
+  padding: 26px; width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: 16px;
+  transform: translateY(10px); transition: transform .2s;
 }
 .overlay.show .modal { transform: translateY(0); }
 .modal-top { display: flex; align-items: center; justify-content: space-between; }
 .modal-title { font-size: 16px; font-weight: 600; }
 .modal-close {
   background: none; border: none; color: #555;
-  font-size: 18px; cursor: pointer; padding: 2px 6px;
+  font-size: 18px; cursor: pointer; padding: 4px 8px;
   -webkit-tap-highlight-color: transparent;
 }
-.modal-close:hover { color: #fff; }
 
-/* code display */
+/* ── ZONE D'AFFICHAGE DU CODE ───────────────────────────────
+   Affiche le code à partager dans un encadré lisible.
+   word-break:break-all = coupe le code long sur mobile.    */
 .code-block {
-  background: #0d0d0d; border: 1px solid #1f1f1f;
-  border-radius: 10px; padding: 20px; text-align: center;
+  background: #0d0d0d; border: 1px solid #222;
+  border-radius: 10px; padding: 16px; text-align: center;
 }
-.code-num {
-  font-size: 34px; font-weight: 700;
-  letter-spacing: 9px; color: #fff;
+.code-txt {
+  font-family: monospace; font-size: 13px; color: #fff;
+  word-break: break-all; line-height: 1.6;
+  /* Le code peut faire ~200 caractères donc on le wrap */
 }
-.code-exp { font-size: 11px; color: #444; margin-top: 6px; }
+.code-lbl { font-size: 11px; color: #555; margin-bottom: 8px; }
+
+/* ── CHAMP DE SAISIE DU CODE ────────────────────────────── */
+.code-input {
+  width: 100%; background: #0d0d0d; border: 1px solid #2a2a2a;
+  border-radius: 8px; color: #fff; font-size: 12px;
+  font-family: monospace; padding: 12px; resize: none;
+  height: 100px; line-height: 1.5;
+}
+.code-input:focus { outline: none; border-color: #555; }
 
 .row2 { display: flex; gap: 8px; }
 .row2 .btn { flex: 1; }
 
-/* join input */
-.join-input {
-  width: 100%; background: #0d0d0d;
-  border: 1px solid #2a2a2a; border-radius: 8px;
-  color: #fff; font-size: 22px; font-family: monospace;
-  padding: 14px; text-align: center; letter-spacing: 6px;
-}
-.join-input:focus { outline: none; border-color: #555; }
-
-/* ── WAITING ── */
-.wait-wrap {
-  max-width: 360px; margin: 0 auto;
-  display: flex; flex-direction: column; gap: 20px;
-}
-.wait-header { display: flex; flex-direction: column; gap: 4px; }
+/* ── ÉCRAN D'ATTENTE ────────────────────────────────────────
+   Affiché pendant la phase de connexion WebRTC.            */
+.wait-wrap { max-width: 360px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .wait-title { font-size: 19px; font-weight: 600; }
 .wait-sub { font-size: 13px; color: #555; }
 
+/* ── INDICATEURS D'ÉTAPES ───────────────────────────────────
+   4 petits points qui montrent où on en est dans la
+   connexion WebRTC. Blanc = actif, vert = terminé.        */
 .steps { display: flex; flex-direction: column; gap: 9px; }
 .step-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #555; }
 .sdot2 { width: 7px; height: 7px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; }
@@ -119,160 +145,85 @@ body {
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
 .lbl { font-size: 11px; color: #444; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-
-textarea, .sdp-input {
-  width: 100%; background: #0d0d0d;
-  border: 1px solid #1f1f1f; border-radius: 8px;
-  color: #fff; font-size: 11px; font-family: monospace;
-  padding: 10px; resize: none; height: 80px;
-}
-textarea:focus { outline: none; border-color: #444; }
-
-.sdp-block { display: flex; flex-direction: column; gap: 6px; }
-.sdp-section { display: flex; flex-direction: column; gap: 12px; }
-
-/* divider */
 .divider { border: none; border-top: 1px solid #1a1a1a; }
 
-/* ── CALL SCREEN ── */
+/* ── ÉCRAN D'APPEL ──────────────────────────────────────────
+   Prend toute la hauteur de l'écran.
+   La vidéo distante est en grand, la locale en petit coin. */
 #sc { flex-direction: column; height: 100vh; background: #000; }
+.call-body { flex: 1; display: flex; min-height: 0; }
+.call-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
+/* Zone vidéo principale */
 .vid-area { flex: 1; position: relative; background: #000; overflow: hidden; min-height: 0; }
 #remVid { width: 100%; height: 100%; object-fit: cover; display: none; }
 
+/* Petite vidéo locale en bas à droite, déplaçable à la souris */
 #locVid {
   position: absolute; bottom: 14px; right: 14px;
-  width: 110px; height: 74px;
-  border-radius: 8px; object-fit: cover;
-  border: 1px solid #333; background: #111;
-  cursor: move; z-index: 10;
+  width: 110px; height: 74px; border-radius: 8px;
+  object-fit: cover; border: 1px solid #333;
+  background: #111; cursor: move; z-index: 10;
 }
 
+/* Placeholder affiché quand la vidéo distante n'est pas encore là */
 .rph {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px; color: #2a2a2a;
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; color: #2a2a2a;
 }
 .rph-icon { font-size: 52px; }
 .rph-txt  { font-size: 13px; color: #333; }
 
-/* call info top-left */
+/* Bandeau info en haut à gauche (chronomètre + E2E) */
 .call-info {
   position: absolute; top: 14px; left: 14px;
   display: flex; align-items: center; gap: 8px;
-  background: rgba(0,0,0,.7);
-  padding: 6px 12px; border-radius: 20px;
+  background: rgba(0,0,0,.7); padding: 6px 12px; border-radius: 20px;
 }
-.live-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #fff; animation: blink 2s infinite;
-}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: blink 2s infinite; }
 #cTimer { font-size: 13px; font-family: monospace; color: #fff; }
 .enc-tag { font-size: 10px; color: #555; }
 
-/* controls bar */
+/* ── BARRE DE CONTRÔLES ─────────────────────────────────────
+   Boutons ronds en bas de l'écran pendant l'appel.
+   .cb.on  = actif (blanc)
+   .cb.off = inactif (gris foncé)
+   .cb.end = raccrocher (rouge)                             */
 .controls {
-  background: #0d0d0d;
-  padding: 14px 12px;
+  background: #0d0d0d; padding: 14px 12px;
   display: flex; align-items: center; justify-content: center;
-  gap: 8px; flex-wrap: wrap;
-  border-top: 1px solid #1a1a1a;
-  flex-shrink: 0;
+  gap: 8px; flex-wrap: wrap; border-top: 1px solid #1a1a1a; flex-shrink: 0;
 }
-
 .cb {
-  width: 46px; height: 46px; border-radius: 50%;
-  border: none; cursor: pointer; font-size: 17px;
-  display: flex; align-items: center; justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-  transition: opacity .12s;
-  flex-shrink: 0;
+  width: 46px; height: 46px; border-radius: 50%; border: none;
+  cursor: pointer; font-size: 17px; display: flex; align-items: center;
+  justify-content: center; -webkit-tap-highlight-color: transparent;
+  transition: opacity .12s; flex-shrink: 0;
 }
 .cb:active { opacity: .55; }
+.cb.on  { background: #fff; color: #0d0d0d; }
+.cb.off { background: #1c1c1c; color: #fff; border: 1px solid #2a2a2a; }
+.cb.end { background: #c0392b; color: #fff; width: 52px; height: 52px; font-size: 19px; }
 
-.cb.on   { background: #fff; color: #0d0d0d; }
-.cb.off  { background: #1c1c1c; color: #fff; border: 1px solid #2a2a2a; }
-.cb.end  { background: #c0392b; color: #fff; width: 52px; height: 52px; font-size: 19px; }
-
-/* side panel (chat) */
-.call-body { flex: 1; display: flex; min-height: 0; }
-.call-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.side { width: 260px; flex-shrink: 0; background: #0d0d0d; border-left: 1px solid #1a1a1a; display: flex; flex-direction: column; }
-
-.side-hdr {
-  padding: 12px 14px;
-  font-size: 11px; color: #444;
-  text-transform: uppercase; letter-spacing: 1px;
-  border-bottom: 1px solid #1a1a1a;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.side-hdr span { color: #2a2a2a; font-size: 10px; }
-
-#chatMsgs {
-  flex: 1; overflow-y: auto; padding: 12px;
-  display: flex; flex-direction: column; gap: 8px;
-  min-height: 0;
-}
-#chatMsgs::-webkit-scrollbar { width: 3px; }
-#chatMsgs::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
-
-.msg { display: flex; flex-direction: column; gap: 2px; max-width: 82%; }
-.msg.me { align-self: flex-end; align-items: flex-end; }
-.msg.them { align-self: flex-start; }
-.mbub { padding: 7px 11px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-word; }
-.msg.me .mbub   { background: #fff; color: #0d0d0d; }
-.msg.them .mbub { background: #1c1c1c; color: #fff; }
-.mtime { font-size: 10px; color: #444; }
-
-.chat-input-row {
-  display: flex; gap: 6px; padding: 10px;
-  border-top: 1px solid #1a1a1a;
-  flex-shrink: 0;
-}
-.chat-input-row input {
-  flex: 1; background: #1a1a1a; border: 1px solid #222;
-  border-radius: 8px; color: #fff; font-size: 13px; padding: 8px 12px;
-}
-.chat-input-row input:focus { outline: none; border-color: #444; }
-.chat-send {
-  width: 34px; height: 34px; border-radius: 8px;
-  background: #fff; color: #0d0d0d; border: none;
-  font-size: 15px; cursor: pointer; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* stats bar in call */
-.stats-row {
-  display: flex; gap: 16px; padding: 6px 14px;
-  border-bottom: 1px solid #1a1a1a;
-  font-size: 11px; color: #444; font-family: monospace;
-  flex-shrink: 0;
-}
-.stats-row span { color: #666; }
-
-/* settings panel */
+/* ── PARAMÈTRES (panneau sous les contrôles) ───────────────
+   Apparaît/disparaît quand on clique sur ⚙️              */
 .set-panel { padding: 14px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #1a1a1a; }
 .set-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #888; }
 
+/* Toggle on/off style switch */
 .tog {
-  width: 36px; height: 20px; border-radius: 10px;
-  background: #222; border: none; position: relative;
-  cursor: pointer; transition: background .2s; flex-shrink: 0;
+  width: 36px; height: 20px; border-radius: 10px; background: #222;
+  border: none; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
 }
 .tog::after {
-  content: ''; position: absolute;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #555; top: 3px; left: 3px;
-  transition: transform .2s, background .2s;
+  content: ''; position: absolute; width: 14px; height: 14px;
+  border-radius: 50%; background: #555; top: 3px; left: 3px; transition: transform .2s, background .2s;
 }
 .tog.on { background: #1f1f1f; border: 1px solid #333; }
 .tog.on::after { transform: translateX(16px); background: #fff; }
-
 select {
-  background: #1a1a1a; border: 1px solid #222;
-  border-radius: 6px; color: #fff; font-size: 12px; padding: 4px 7px;
-  max-width: 110px;
+  background: #1a1a1a; border: 1px solid #222; border-radius: 6px;
+  color: #fff; font-size: 12px; padding: 4px 7px; max-width: 110px;
 }
 input[type=range] {
   -webkit-appearance: none; width: 80px; height: 3px;
@@ -283,112 +234,252 @@ input[type=range]::-webkit-slider-thumb {
   border-radius: 50%; background: #fff; cursor: pointer;
 }
 
-/* ── QUALITY DOTS ── */
+/* ── PANNEAU CHAT ───────────────────────────────────────────
+   Affiché sur le côté droit pendant l'appel.
+   Bulles blanches = moi, bulles grises = l'autre.        */
+.side {
+  /* Sur desktop : panneau latéral fixe 260px */
+  width: 260px; flex-shrink: 0; background: #0d0d0d;
+  border-left: 1px solid #1a1a1a; display: flex; flex-direction: column;
+}
+
+/* ── RESPONSIVE MOBILE ──────────────────────────────────────
+   En portrait sur mobile : le chat passe en bas (overlay)
+   plutôt qu'un panneau côté qui prend de la place.
+   En paysage : on garde le panneau côté mais plus étroit.  */
+@media (max-width: 600px) {
+  /* En mode portrait mobile, on empile verticalement */
+  .call-body { flex-direction: column; }
+  /* Le chat devient une feuille du bas sur mobile */
+  .side {
+    width: 100%; max-height: 220px;
+    border-left: none; border-top: 1px solid #1a1a1a;
+    flex-shrink: 0;
+  }
+  /* Les boutons de contrôle plus grands pour les doigts */
+  .cb { width: 50px; height: 50px; font-size: 19px; }
+  .cb.end { width: 56px; height: 56px; font-size: 21px; }
+  /* Stats plus compactes */
+  .stats-row { gap: 10px; padding: 5px 10px; font-size: 10px; }
+}
+
+/* En paysage sur mobile : panneau chat plus étroit */
+@media (max-height: 500px) and (orientation: landscape) {
+  .side { width: 200px; }
+  /* Contrôles plus compacts */
+  .controls { padding: 8px 10px; gap: 6px; }
+  .cb { width: 40px; height: 40px; font-size: 15px; }
+  .cb.end { width: 46px; height: 46px; }
+  /* Vidéo locale plus petite */
+  #locVid { width: 90px; height: 60px; }
+  /* Cache la barre stats en paysage pour gagner de la place */
+  .stats-row { display: none; }
+}
+.side-hdr {
+  padding: 12px 14px; font-size: 11px; color: #444;
+  text-transform: uppercase; letter-spacing: 1px;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex; justify-content: space-between; align-items: center;
+}
+#chatMsgs {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px; min-height: 0;
+}
+#chatMsgs::-webkit-scrollbar { width: 3px; }
+#chatMsgs::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+.msg { display: flex; flex-direction: column; gap: 2px; max-width: 82%; }
+.msg.me   { align-self: flex-end; align-items: flex-end; }
+.msg.them { align-self: flex-start; }
+.mbub { padding: 7px 11px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-word; }
+.msg.me   .mbub { background: #fff; color: #0d0d0d; }
+.msg.them .mbub { background: #1c1c1c; color: #fff; }
+.mtime { font-size: 10px; color: #444; }
+.chat-input-row { display: flex; gap: 6px; padding: 10px; border-top: 1px solid #1a1a1a; flex-shrink: 0; }
+.chat-input-row input {
+  flex: 1; background: #1a1a1a; border: 1px solid #222;
+  border-radius: 8px; color: #fff; font-size: 13px; padding: 8px 12px;
+}
+.chat-input-row input:focus { outline: none; border-color: #444; }
+.chat-send {
+  width: 34px; height: 34px; border-radius: 8px; background: #fff;
+  color: #0d0d0d; border: none; font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── BARRE STATS ────────────────────────────────────────────
+   Affiche latence, résolution, FPS et barres de signal.  */
+.stats-row {
+  display: flex; gap: 16px; padding: 6px 14px;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: 11px; color: #444; font-family: monospace; flex-shrink: 0;
+}
+.stats-row span { color: #666; }
 .qbars { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
 .qb { width: 4px; border-radius: 2px; background: #222; }
 .qb.good { background: #fff; }
 .qb.warn { background: #888; }
 .qb.bad  { background: #c0392b; }
 
-/* ── TOAST ── */
+/* ── RÉACTIONS RAPIDES ──────────────────────────────────────
+   Barre d'emojis qui apparaît au-dessus des contrôles.
+   Les réactions sont envoyées via le DataChannel et
+   s'affichent brièvement en superposition sur la vidéo.  */
+.reactions-bar {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 8px 12px;
+  background: #0d0d0d; border-top: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+.react-btn {
+  background: #1a1a1a; border: 1px solid #2a2a2a;
+  border-radius: 50%; width: 40px; height: 40px;
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s;
+}
+.react-btn:active { transform: scale(1.3); }
+
+/* Réaction flottante qui monte et disparaît sur la vidéo */
+.float-react {
+  position: absolute; font-size: 36px;
+  animation: floatUp 2s ease forwards;
+  pointer-events: none; z-index: 20;
+  bottom: 80px;
+}
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  80%  { opacity: 1; transform: translateY(-120px) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-160px) scale(0.8); }
+}
+
+/* ── TOASTS ─────────────────────────────────────────────────
+   Petites notifications qui apparaissent en bas.         */
 #tc {
   position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-  z-index: 999; display: flex; flex-direction: column; gap: 6px; align-items: center;
-  pointer-events: none;
+  z-index: 999; display: flex; flex-direction: column; gap: 6px;
+  align-items: center; pointer-events: none;
 }
 .toast {
-  background: #1a1a1a; border: 1px solid #2a2a2a;
-  border-radius: 7px; padding: 8px 16px;
-  font-size: 13px; color: #fff; white-space: nowrap;
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 7px;
+  padding: 8px 16px; font-size: 13px; color: #fff; white-space: nowrap;
   animation: tin .2s ease, tout .2s ease 2.8s forwards;
 }
-@keyframes tin  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-@keyframes tout { from { opacity:1; } to { opacity:0; } }
+@keyframes tin  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes tout { from{opacity:1} to{opacity:0} }
 
-/* ── VERSION ── */
+/* ── VERSION ──────────────────────────────────────────────── */
 #ver { position: fixed; bottom: 5px; right: 9px; font-size: 10px; color: #222; pointer-events: none; z-index: 999; font-family: monospace; }
 </style>
 </head>
 <body>
 
-<!-- ════ HOME ════ -->
+<!-- ══════════════════════════════════════════════
+     ÉCRAN 1 : ACCUEIL
+     Affiché au démarrage. Deux boutons :
+     - Créer un appel (on est l'hôte)
+     - Rejoindre un appel (on est l'invité)
+     ══════════════════════════════════════════════ -->
 <div id="sh">
   <div class="logo">
     <div class="logo-name">my<span>'</span>voc</div>
     <div class="logo-sub">Appel P2P &middot; Chiffr&eacute; E2E</div>
   </div>
-
   <div class="home-actions">
     <button class="btn btn-w" id="btnCreate">Nouvel appel</button>
     <button class="btn btn-g" id="btnJoin">Rejoindre un appel</button>
   </div>
 </div>
 
-<!-- ════ WAITING ════ -->
+<!-- ══════════════════════════════════════════════
+     ÉCRAN 2 : ATTENTE
+     Affiché pendant la phase de signalement WebRTC.
+     Montre les étapes de connexion en cours.
+     ══════════════════════════════════════════════ -->
 <div id="sw">
   <div class="wait-wrap">
-    <div class="wait-header">
+    <div>
       <div class="wait-title" id="wTitle">En attente&hellip;</div>
-      <div class="wait-sub" id="wDesc">Partagez le code avec votre correspondant</div>
+      <div class="wait-sub" id="wDesc" style="margin-top:4px">Connexion en cours</div>
     </div>
 
+    <!-- Indicateurs visuels des 4 étapes WebRTC -->
     <div class="steps">
       <div class="step-row"><div class="sdot2 act2" id="st1"></div>Initialisation WebRTC</div>
-      <div class="step-row"><div class="sdot2" id="st2"></div>&#xC9;change des cl&eacute;s</div>
-      <div class="step-row"><div class="sdot2" id="st3"></div>Connexion ICE</div>
+      <div class="step-row"><div class="sdot2" id="st2"></div>G&eacute;n&eacute;ration du code</div>
+      <div class="step-row"><div class="sdot2" id="st3"></div>Connexion ICE (r&eacute;seau)</div>
       <div class="step-row"><div class="sdot2" id="st4"></div>Canal actif</div>
     </div>
 
-    <div class="code-block hidden" id="wCode">
-      <div class="code-num" id="dCode">------</div>
-      <div class="code-exp">expire dans <span id="cExp">10:00</span></div>
+    <!-- SECTION HÔTE : affiche le code offre à envoyer -->
+    <div class="hidden" id="hostSection">
+      <hr class="divider" style="margin-bottom:16px">
+      <div class="lbl">&#x2460; Envoyez ce code &agrave; votre correspondant</div>
+      <div class="code-block" style="margin:8px 0 12px">
+        <!-- Le code offre encodé en base64 apparaîtra ici -->
+        <div class="code-lbl">Code offre &mdash; expire dans <span id="codeExpiry" style="color:#fff;font-weight:600">10:00</span></div>
+        <div class="code-txt" id="hostCodeTxt">G&eacute;n&eacute;ration&hellip;</div>
+      </div>
+      <div class="row2" style="margin-bottom:16px">
+        <button class="btn btn-g" id="btnCopyOffer">Copier le code</button>
+        <button class="btn btn-g btn-sm" id="btnShareOffer">Partager</button>
+      </div>
+      <hr class="divider" style="margin-bottom:16px">
+      <div class="lbl">&#x2461; Collez le code retour re&ccedil;u</div>
+      <!-- Zone où l'hôte colle le code retour de l'invité -->
+      <textarea class="code-input" id="hostReturnInput" maxlength="2000" placeholder="Collez ici le code retour envoy&eacute; par votre correspondant&hellip;" style="margin:8px 0 10px"></textarea>
+      <button class="btn btn-w" id="btnConfirmReturn">Confirmer la connexion</button>
     </div>
 
-    <!-- HOST SDP -->
-    <div class="sdp-section hidden" id="hostSDP">
-      <hr class="divider">
-      <div class="sdp-block">
-        <div class="lbl">Votre offre &mdash; &agrave; envoyer</div>
-        <textarea id="hostOffer" readonly></textarea>
-        <button class="btn btn-g" id="btnCopyOffer">Copier l'offre</button>
-      </div>
-      <div class="sdp-block">
-        <div class="lbl">R&eacute;ponse re&ccedil;ue &mdash; collez ici</div>
-        <textarea id="hostAns" placeholder="Collez la r&eacute;ponse&hellip;"></textarea>
-        <button class="btn btn-w" id="btnProcAns">Confirmer</button>
+    <!-- SECTION INVITÉ : colle le code offre, reçoit le code retour -->
+    <div class="hidden" id="clientSection">
+      <hr class="divider" style="margin-bottom:16px">
+      <div class="lbl">&#x2460; Collez le code re&ccedil;u</div>
+      <!-- Zone où l'invité colle le code offre de l'hôte -->
+      <textarea class="code-input" id="clientCodeInput" maxlength="2000" placeholder="Collez ici le code envoy&eacute; par la personne qui a cr&eacute;&eacute; l&apos;appel&hellip;" style="margin:8px 0 10px"></textarea>
+      <button class="btn btn-w" id="btnProcessCode">Traiter le code</button>
+
+      <!-- Apparaît après traitement : code retour à renvoyer à l'hôte -->
+      <div class="hidden" id="clientReturnSection">
+        <hr class="divider" style="margin:16px 0">
+        <div class="lbl">&#x2461; Envoyez ce code retour &agrave; votre correspondant</div>
+        <div class="code-block" style="margin:8px 0 12px">
+          <div class="code-lbl">Code retour</div>
+          <div class="code-txt" id="clientReturnTxt">G&eacute;n&eacute;ration&hellip;</div>
+        </div>
+        <div class="row2">
+          <button class="btn btn-g" id="btnCopyReturn">Copier le code retour</button>
+          <button class="btn btn-g btn-sm" id="btnShareReturn">Partager</button>
+        </div>
       </div>
     </div>
 
-    <!-- CLIENT SDP -->
-    <div class="sdp-section hidden" id="clientSDP">
-      <hr class="divider">
-      <div class="sdp-block">
-        <div class="lbl">Offre re&ccedil;ue &mdash; collez ici</div>
-        <textarea id="clientOffer" placeholder="Collez l'offre&hellip;"></textarea>
-        <button class="btn btn-w" id="btnProcOffer">Traiter l'offre</button>
-      </div>
-      <div class="sdp-block hidden" id="clientAnsSection">
-        <div class="lbl">Votre r&eacute;ponse &mdash; &agrave; envoyer</div>
-        <textarea id="clientAns" readonly></textarea>
-        <button class="btn btn-g hidden" id="btnCopyAns">Copier la r&eacute;ponse</button>
-      </div>
-    </div>
-
-    <button class="btn btn-g" id="btnCancel">Annuler</button>
+    <button class="btn btn-g" id="btnCancel" style="margin-top:4px">Annuler</button>
   </div>
 </div>
 
-<!-- ════ CALL ════ -->
+<!-- ══════════════════════════════════════════════
+     ÉCRAN 3 : APPEL EN COURS
+     Vidéo distante en plein écran, vidéo locale
+     en petit coin. Contrôles en bas.
+     ══════════════════════════════════════════════ -->
 <div id="sc">
   <div class="call-body">
     <div class="call-main">
+
+      <!-- Zone vidéo -->
       <div class="vid-area">
+        <!-- Placeholder quand la vidéo distante n'est pas encore reçue -->
         <div class="rph" id="rph">
           <div class="rph-icon">&#x1F464;</div>
           <div class="rph-txt">En attente du flux vid&eacute;o&hellip;</div>
         </div>
+        <!-- Vidéo de l'interlocuteur (grande) -->
         <video id="remVid" autoplay playsinline></video>
+        <!-- Votre propre vidéo (petite, coin bas-droit, déplaçable) -->
         <video id="locVid" autoplay playsinline muted></video>
+        <!-- Chronomètre + badge E2E -->
         <div class="call-info">
           <div class="live-dot"></div>
           <div id="cTimer">00:00</div>
@@ -396,12 +487,11 @@ input[type=range]::-webkit-slider-thumb {
         </div>
       </div>
 
-      <!-- stats -->
-      <div class="stats-row" id="statsRow">
-        Latence&nbsp;<span id="latency">--</span>&nbsp;&nbsp;
-        R&eacute;s.&nbsp;<span id="resol">--</span>&nbsp;&nbsp;
+      <!-- Barre de stats réseau -->
+      <div class="stats-row">
+        Lat&nbsp;<span id="latency">--</span>&nbsp;&nbsp;
+        R&eacute;s&nbsp;<span id="resol">--</span>&nbsp;&nbsp;
         FPS&nbsp;<span id="fps">--</span>&nbsp;&nbsp;
-        Signal&nbsp;
         <div class="qbars">
           <div class="qb good" id="q1" style="height:4px"></div>
           <div class="qb good" id="q2" style="height:7px"></div>
@@ -411,20 +501,32 @@ input[type=range]::-webkit-slider-thumb {
         </div>
       </div>
 
-      <!-- controls -->
-      <div class="controls">
-        <button class="cb on"  id="bMic">&#x1F399;</button>
-        <button class="cb on"  id="bCam">&#x1F4F7;</button>
-        <button class="cb off" id="bNoise">&#x1F39A;</button>
-        <button class="cb off" id="bScr">&#x1F5A5;</button>
-        <button class="cb off" id="bRec">&#x23FA;</button>
-        <button class="cb off" id="bBlur">&#x1F32B;</button>
-        <button class="cb on"  id="bChat">&#x1F4AC;</button>
-        <button class="cb off" id="bSet">&#x2699;</button>
-        <button class="cb end" id="bEnd">&#x2716;</button>
+      <!-- Barre de réactions rapides (s'envoient via DataChannel) -->
+      <div class="reactions-bar" id="reactBar">
+        <button class="react-btn" id="r1" title="Pouce">&#x1F44D;</button>
+        <button class="react-btn" id="r2" title="Coeur">&#x2764;&#xFE0F;</button>
+        <button class="react-btn" id="r3" title="Rire">&#x1F602;</button>
+        <button class="react-btn" id="r4" title="Surprise">&#x1F62E;</button>
+        <button class="react-btn" id="r5" title="Applaudir">&#x1F44F;</button>
+        <button class="react-btn" id="r6" title="Feu">&#x1F525;</button>
       </div>
 
-      <!-- settings (hidden by default) -->
+      <!-- Boutons de contrôle pendant l'appel -->
+      <div class="controls">
+        <button class="cb on"  id="bMic"   title="Micro (M)">&#x1F399;</button>
+        <button class="cb on"  id="bCam"   title="Cam&eacute;ra (V)">&#x1F4F7;</button>
+        <!-- Bouton bascule caméra front/back (utile sur mobile) -->
+        <button class="cb off" id="bFlip"  title="Basculer cam&eacute;ra">&#x1F504;</button>
+        <button class="cb off" id="bNoise" title="R&eacute;duction bruit">&#x1F39A;</button>
+        <button class="cb off" id="bScr"   title="Partage &eacute;cran (S)">&#x1F5A5;</button>
+        <button class="cb off" id="bRec"   title="Enregistrer">&#x23FA;</button>
+        <button class="cb off" id="bBlur"  title="Flou arri&egrave;re-plan">&#x1F32B;</button>
+        <button class="cb on"  id="bChat"  title="Chat (C)">&#x1F4AC;</button>
+        <button class="cb off" id="bSet"   title="Param&egrave;tres">&#x2699;</button>
+        <button class="cb end" id="bEnd"   title="Raccrocher (Q)">&#x2716;</button>
+      </div>
+
+      <!-- Panneau paramètres (caché par défaut, s'ouvre avec ⚙️) -->
       <div class="set-panel hidden" id="setP">
         <div class="set-row"><span>Vid&eacute;o HD</span><button class="tog on" id="togHD"></button></div>
         <div class="set-row"><span>Suppression &eacute;cho</span><button class="tog on" id="togEC"></button></div>
@@ -434,7 +536,7 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <!-- chat side panel -->
+    <!-- Panneau chat (côté droit, caché/montré avec 💬) -->
     <div class="side" id="chatP">
       <div class="side-hdr">Chat <span>E2E chiffr&eacute;</span></div>
       <div id="chatMsgs"></div>
@@ -446,179 +548,1052 @@ input[type=range]::-webkit-slider-thumb {
   </div>
 </div>
 
-<!-- ════ MODALS ════ -->
+<!-- ══════════════════════════════════════════════
+     MODALE : CRÉER UN APPEL
+     Affiche le code offre et les options.
+     ══════════════════════════════════════════════ -->
 <div class="overlay" id="mCreate">
   <div class="modal">
     <div class="modal-top">
       <div class="modal-title">Nouvel appel</div>
       <button class="modal-close" id="mCreateClose">&#x2715;</button>
     </div>
-    <div class="code-block">
-      <div class="code-num" id="genCode">------</div>
-      <div class="code-exp">Valide 10 minutes</div>
-    </div>
-    <div class="row2">
-      <button class="btn btn-g" id="btnCopyCode">Copier le code</button>
-      <button class="btn btn-g btn-sm" id="btnShareCode">Partager</button>
-    </div>
-    <button class="btn btn-w" id="btnStartHost">D&eacute;marrer l'appel</button>
+    <p style="font-size:13px;color:#666;line-height:1.5">
+      Cliquez "D&eacute;marrer", copiez le code g&eacute;n&eacute;r&eacute; et envoyez-le &agrave; votre correspondant via SMS, WhatsApp, etc.
+    </p>
+    <button class="btn btn-w" id="btnStartHost">D&eacute;marrer l&apos;appel</button>
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════
+     MODALE : REJOINDRE UN APPEL
+     L'invité colle le code reçu ici.
+     ══════════════════════════════════════════════ -->
 <div class="overlay" id="mJoin">
   <div class="modal">
     <div class="modal-top">
       <div class="modal-title">Rejoindre</div>
       <button class="modal-close" id="mJoinClose">&#x2715;</button>
     </div>
-    <input class="join-input" type="text" id="joinIn" placeholder="A3X-7P2" maxlength="10">
+    <p style="font-size:13px;color:#666;line-height:1.5">
+      Collez le code envoy&eacute; par la personne qui a cr&eacute;&eacute; l&apos;appel.
+    </p>
+    <!-- Textarea pour coller le code offre -->
+    <textarea class="code-input" id="joinCodeInput" maxlength="2000" placeholder="Collez le code ici&hellip;" style="height:90px"></textarea>
     <button class="btn btn-w" id="btnStartJoin">Rejoindre</button>
   </div>
 </div>
 
+<!-- Conteneur des toasts (notifications) -->
 <div id="tc"></div>
-<div id="ver">v1.7.1</div>
+<!-- Numéro de version affiché discrètement en bas à droite -->
+<div id="ver">v1.9.0</div>
 
 <script>
+/*
+ * ══════════════════════════════════════════════════════════
+ *  TOUT LE CODE JS EST DANS UN IIFE (fonction auto-exécutée)
+ *  Cela évite de polluer l'espace global du navigateur et
+ *  empêche les conflits avec d'éventuels scripts externes.
+ * ══════════════════════════════════════════════════════════
+ */
 (function(){
 'use strict';
 
-var S={isHost:false,code:'',pc:null,ls:null,dc:null,t0:null,tTimer:null,tStats:null,tKA:null,tCode:null,micOn:true,camOn:true,scrSharing:false,recording:false,blurOn:false,chatVis:true,setVis:false,mr:null,chunks:[]};
-var ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}],iceCandidatePoolSize:10};
-
-// WAKE LOCK
-var WL={sen:null,vid:null,
-  enable:function(){var self=this;if('wakeLock' in navigator){navigator.wakeLock.request('screen').then(function(s){self.sen=s;s.addEventListener('release',function(){if(S.t0)setTimeout(function(){self.enable();},800);});}).catch(function(){});}if(!this.vid){var v=document.createElement('video');v.setAttribute('playsinline','');v.setAttribute('muted','');v.loop=true;v.style.cssText='position:fixed;width:1px;height:1px;opacity:.001;top:-9px;pointer-events:none;z-index:-1';v.src='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0MiByMjQ3OSBkZDc5YTYxIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTYgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAPZWxpYng=';document.body.appendChild(v);v.play().catch(function(){});this.vid=v;}},
-  disable:function(){try{if(this.sen){this.sen.release();this.sen=null;}}catch(e){}if(this.vid){this.vid.pause();this.vid.remove();this.vid=null;}}
+/*
+ * ── ÉTAT GLOBAL DE L'APPLICATION ──────────────────────────
+ * S = State. Toutes les variables d'état sont ici.
+ * C'est plus propre que des variables globales éparpillées.
+ */
+var S = {
+  isHost: false,        // true si on a créé l'appel, false si on a rejoint
+  pc: null,             // RTCPeerConnection — la connexion WebRTC
+  ls: null,             // LocalStream — flux audio/vidéo local
+  dc: null,             // DataChannel — canal de données pour le chat
+  t0: null,             // Timestamp du début de l'appel (pour le chrono)
+  tTimer: null,         // Intervalle du chronomètre
+  tStats: null,         // Intervalle des stats réseau
+  tKA: null,            // Intervalle du keep-alive (anti-coupure Android)
+  tCode: null,          // Intervalle du compte à rebours du code offre
+  micOn: true,          // Micro activé ?
+  camOn: true,          // Caméra activée ?
+  scrSharing: false,    // Partage d'écran en cours ?
+  recording: false,     // Enregistrement en cours ?
+  blurOn: false,        // Flou arrière-plan activé ?
+  facingMode: 'user',   // Caméra active : 'user'=selfie, 'environment'=dos
+  chatVis: true,        // Panneau chat visible ?
+  setVis: false,        // Panneau paramètres visible ?
+  mr: null,             // MediaRecorder pour l'enregistrement
+  chunks: []            // Morceaux de l'enregistrement vidéo
 };
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&S.t0&&!WL.sen)WL.enable();});
 
-// HELPERS
-function show(id){['sh','sw','sc'].forEach(function(s){document.getElementById(s).style.display='none';});var el=document.getElementById(id);el.style.display=(id==='sc')?'flex':'block';if(id==='sc')el.style.flexDirection='column';}
-function step(n,st){var el=document.getElementById('st'+n);if(!el)return;el.className='sdot2'+(st==='done'?' done':st==='act'?' act2':'');}
-function toast(msg){var el=document.createElement('div');el.className='toast';el.textContent=msg;document.getElementById('tc').appendChild(el);setTimeout(function(){el.remove();},3200);}
-function genCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='';for(var i=0;i<6;i++){if(i===3)r+='-';r+=c[Math.floor(Math.random()*c.length)];}return r;}
-function openM(id){document.getElementById(id).classList.add('show');}
-function closeM(id){document.getElementById(id).classList.remove('show');}
+/*
+ * ── CONFIGURATION ICE ──────────────────────────────────────
+ * ICE = Interactive Connectivity Establishment.
+ * Les serveurs STUN permettent aux appareils derrière un
+ * routeur (NAT) de se découvrir mutuellement sur Internet.
+ * On utilise les serveurs STUN publics de Google et Cloudflare
+ * (gratuits, sans inscription).
+ */
+var ICE = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ],
+  iceCandidatePoolSize: 10  // Pré-collecte 10 candidats ICE pour accélérer la connexion
+};
 
-function startCodeTimer(){var secs=600,el=document.getElementById('cExp');if(S.tCode)clearInterval(S.tCode);S.tCode=setInterval(function(){secs--;var m=String(Math.floor(secs/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0');if(el)el.textContent=m+':'+s;if(secs<=0){clearInterval(S.tCode);toast('Code expir\u00e9.');}},1000);}
+/*
+ * ══════════════════════════════════════════════════════════
+ *  WAKE LOCK — ANTI-COUPURE ANDROID
+ *  Android coupe les connexions réseau quand l'écran s'éteint
+ *  (mode Doze). On utilise deux méthodes pour l'empêcher :
+ *  1. Screen Wake Lock API (moderne, Chrome 84+)
+ *  2. Vidéo 1×1 pixel en boucle (Android ne dort pas pendant
+ *     une lecture vidéo — même technique que YouTube/Netflix)
+ * ══════════════════════════════════════════════════════════
+ */
+var WL = {
+  sen: null,  // Le "sentinel" de wake lock (pour le relâcher plus tard)
+  vid: null,  // L'élément vidéo invisible
 
-function initMedia(){return navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},audio:{echoCancellation:true,noiseSuppression:false,autoGainControl:true}}).then(function(stream){S.ls=stream;document.getElementById('locVid').srcObject=stream;toast('Cam\u00e9ra & micro activ\u00e9s');}).catch(function(){return navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){S.ls=stream;document.getElementById('locVid').srcObject=stream;toast('Micro activ\u00e9');});});}
+  enable: function() {
+    var self = this;
 
-function createPC(){var pc=new RTCPeerConnection(ICE);S.pc=pc;if(S.ls)S.ls.getTracks().forEach(function(t){pc.addTrack(t,S.ls);});if(S.isHost){var dc=pc.createDataChannel('chat',{ordered:true});setupDC(dc);}else{pc.ondatachannel=function(e){setupDC(e.channel);};}pc.ontrack=function(e){var v=document.getElementById('remVid');if(!v.srcObject)v.srcObject=new MediaStream();v.srcObject.addTrack(e.track);v.style.display='block';document.getElementById('rph').style.display='none';toast('Connexion vid\u00e9o \u00e9tablie');};pc.oniceconnectionstatechange=function(){var st=pc.iceConnectionState;if(st==='connected'||st==='completed'){step(3,'done');step(4,'act');setTimeout(function(){step(4,'done');onConnected();},500);}else if(st==='failed'){toast('Connexion \u00e9chou\u00e9e. Reconnexion\u2026');try{pc.restartIce();}catch(e){}}else if(st==='disconnected'){toast('Connexion interrompue\u2026');setTimeout(function(){if(pc.iceConnectionState==='disconnected')try{pc.restartIce();}catch(e){}},3000);}};return pc;}
+    // Méthode 1 : Wake Lock API
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(function(s) {
+        self.sen = s;
+        // Si Android relâche le wake lock, on le ré-acquiert automatiquement
+        s.addEventListener('release', function() {
+          if (S.t0) setTimeout(function(){ self.enable(); }, 800);
+        });
+      }).catch(function(){});
+    }
 
-function setupDC(dc){S.dc=dc;dc.onopen=function(){toast('Canal chiffr\u00e9 ouvert');};dc.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='chat')addMsg(m.text,false,m.time);if(m.type==='ping')dc.send(JSON.stringify({type:'pong',ts:m.ts}));if(m.type==='pong')updateLat(Date.now()-m.ts);};}
-function waitICE(){return new Promise(function(res){if(S.pc.iceGatheringState==='complete'){res();return;}S.pc.addEventListener('icegatheringstatechange',function(){if(S.pc.iceGatheringState==='complete')res();});setTimeout(res,4000);});}
+    // Méthode 2 : vidéo invisible en boucle (fallback universel)
+    if (!this.vid) {
+      var v = document.createElement('video');
+      v.setAttribute('playsinline', '');
+      v.setAttribute('muted', '');
+      v.loop = true;
+      v.style.cssText = 'position:fixed;width:1px;height:1px;opacity:.001;top:-9px;pointer-events:none;z-index:-1';
+      // MP4 minimal 1×1 pixel encodé en base64
+      v.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0MiByMjQ3OSBkZDc5YTYxIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTYgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAPZWxpYng=';
+      document.body.appendChild(v);
+      v.play().catch(function(){});
+      this.vid = v;
+    }
+  },
 
-function startHost(){closeM('mCreate');S.isHost=true;show('sw');document.getElementById('wTitle').textContent='En attente de connexion\u2026';document.getElementById('wDesc').textContent='Code\u00a0: '+S.code;document.getElementById('wCode').classList.remove('hidden');document.getElementById('dCode').textContent=S.code;startCodeTimer();step(1,'done');initMedia().then(function(){createPC();return S.pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});}).then(function(offer){return S.pc.setLocalDescription(offer);}).then(function(){return waitICE();}).then(function(){document.getElementById('hostOffer').value=JSON.stringify(S.pc.localDescription);document.getElementById('hostSDP').classList.remove('hidden');step(2,'act');toast('Offre g\u00e9n\u00e9r\u00e9e \u2014 copiez-la');}).catch(function(e){toast('Erreur\u00a0: '+e.message);cancel();});}
+  disable: function() {
+    try { if (this.sen) { this.sen.release(); this.sen = null; } } catch(e){}
+    if (this.vid) { this.vid.pause(); this.vid.remove(); this.vid = null; }
+  }
+};
 
-function startJoin(){var code=document.getElementById('joinIn').value.trim().toUpperCase();if(code.length<5){toast('Code invalide');return;}S.code=code;S.isHost=false;closeM('mJoin');show('sw');document.getElementById('wTitle').textContent='Connexion en cours\u2026';document.getElementById('wDesc').textContent='Code\u00a0: '+code;document.getElementById('clientSDP').classList.remove('hidden');step(1,'done');initMedia().then(function(){createPC();step(2,'act');toast('Collez l\u2019offre re\u00e7ue');}).catch(function(e){toast('Erreur\u00a0: '+e.message);cancel();});}
+// Ré-acquérir le wake lock si l'onglet repasse au premier plan
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && S.t0 && !WL.sen) WL.enable();
+});
 
-function procOffer(){var str=document.getElementById('clientOffer').value.trim();if(!str){toast('Collez l\u2019offre d\u2019abord');return;}try{S.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(str))).then(function(){return S.pc.createAnswer();}).then(function(ans){return S.pc.setLocalDescription(ans);}).then(function(){return waitICE();}).then(function(){document.getElementById('clientAns').value=JSON.stringify(S.pc.localDescription);document.getElementById('clientAnsSection').classList.remove('hidden');document.getElementById('btnCopyAns').classList.remove('hidden');step(3,'act');toast('R\u00e9ponse g\u00e9n\u00e9r\u00e9e \u2014 copiez-la');});}catch(e){toast('Offre invalide');}}
+/*
+ * ══════════════════════════════════════════════════════════
+ *  ENCODAGE / DÉCODAGE DU CODE DE CONNEXION
+ *
+ *  Le SDP (Session Description Protocol) est un bloc de texte
+ *  assez long (~2000 caractères) généré par WebRTC.
+ *  On le compresse en JSON minimal puis on l'encode en base64
+ *  pour obtenir un code unique d'environ 100-200 caractères.
+ *
+ *  sdpToCode(sdp)  → base64 court
+ *  codeToSdp(code) → objet SDP reconstruit
+ * ══════════════════════════════════════════════════════════
+ */
+function sdpToCode(sdpObj) {
+  // On garde seulement type et sdp, on sérialise en JSON et encode en base64
+  var json = JSON.stringify({ type: sdpObj.type, sdp: sdpObj.sdp });
+  // btoa = Binary To Ascii (base64 encoder natif du navigateur)
+  // unescape+encodeURIComponent gère les caractères spéciaux (accents etc.)
+  return btoa(unescape(encodeURIComponent(json)));
+}
 
-function procAnswer(){var str=document.getElementById('hostAns').value.trim();if(!str){toast('Collez la r\u00e9ponse d\u2019abord');return;}try{S.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(str)));step(3,'act');toast('Connexion en cours\u2026');}catch(e){toast('R\u00e9ponse invalide');}}
+function codeToSdp(code) {
+  // Inverse : base64 → JSON → objet SDP
+  var json = decodeURIComponent(escape(atob(code.trim())));
+  return JSON.parse(json);
+}
 
-function onConnected(){if(S.t0)return;if(S.tCode)clearInterval(S.tCode);S.t0=Date.now();show('sc');WL.enable();startTimer();startStats();startKA();toast('Appel chiffr\u00e9 E2E \u00e9tabli');}
+/*
+ * ══════════════════════════════════════════════════════════
+ *  FONCTIONS UTILITAIRES
+ * ══════════════════════════════════════════════════════════
+ */
 
-function startTimer(){var el=document.getElementById('cTimer');S.tTimer=setInterval(function(){var s=Math.floor((Date.now()-S.t0)/1000),h=String(Math.floor(s/3600)).padStart(2,'0'),m=String(Math.floor((s%3600)/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');el.textContent=s>=3600?h+':'+m+':'+sec:m+':'+sec;},1000);}
+// Affiche un seul écran et cache les autres
+function show(id) {
+  ['sh','sw','sc'].forEach(function(s) {
+    document.getElementById(s).style.display = 'none';
+  });
+  var el = document.getElementById(id);
+  el.style.display = (id === 'sc') ? 'flex' : 'block';
+  if (id === 'sc') el.style.flexDirection = 'column';
+}
 
-function startKA(){S.tKA=setInterval(function(){if(S.dc&&S.dc.readyState==='open')try{S.dc.send(JSON.stringify({type:'ping',ts:Date.now()}));}catch(e){}if(document.visibilityState==='visible'&&!WL.sen)WL.enable();if(S.pc){var st=S.pc.iceConnectionState;if(st==='disconnected'||st==='failed')try{S.pc.restartIce();}catch(e){}}},15000);}
+// Met à jour un indicateur d'étape (dot coloré)
+function step(n, st) {
+  var el = document.getElementById('st' + n);
+  if (!el) return;
+  el.className = 'sdot2' + (st==='done' ? ' done' : st==='act' ? ' act2' : '');
+}
 
-function startStats(){S.tStats=setInterval(function(){if(!S.pc)return;S.pc.getStats().then(function(stats){stats.forEach(function(r){if(r.type==='inbound-rtp'&&r.kind==='video'){if(r.framesPerSecond)document.getElementById('fps').textContent=Math.round(r.framesPerSecond);if(r.frameWidth)document.getElementById('resol').textContent=r.frameWidth+'x'+r.frameHeight;}if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.currentRoundTripTime!==undefined)updateLat(r.currentRoundTripTime*1000);});}).catch(function(){});},2000);}
+// Affiche une notification temporaire en bas de l'écran
+function toast(msg) {
+  var el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.getElementById('tc').appendChild(el);
+  setTimeout(function(){ el.remove(); }, 3200);
+}
 
-function updateLat(ms){var el=document.getElementById('latency');el.textContent=Math.round(ms)+'ms';var good=ms<100,ok=ms<250;for(var i=1;i<=5;i++){var b=document.getElementById('q'+i);if(!b)continue;var lv=good?5:ok?3:1;b.className='qb'+(i<=lv?(good?' good':ok?' warn':' bad'):'');}}
+// Ouvre/ferme une modale
+function openM(id)  { document.getElementById(id).classList.add('show'); }
+function closeM(id) { document.getElementById(id).classList.remove('show'); }
 
-function toggleMic(){S.micOn=!S.micOn;if(S.ls)S.ls.getAudioTracks().forEach(function(t){t.enabled=S.micOn;});var b=document.getElementById('bMic');b.className='cb '+(S.micOn?'on':'off');toast(S.micOn?'Micro activ\u00e9':'Micro coup\u00e9');}
-function toggleCam(){S.camOn=!S.camOn;if(S.ls)S.ls.getVideoTracks().forEach(function(t){t.enabled=S.camOn;});var b=document.getElementById('bCam');b.className='cb '+(S.camOn?'on':'off');toast(S.camOn?'Cam\u00e9ra activ\u00e9e':'Cam\u00e9ra coup\u00e9e');}
-function toggleNoise(){var b=document.getElementById('bNoise');var on=b.classList.contains('off');b.className='cb '+(on?'on':'off');toast('Bruit '+(on?'ON':'OFF'));}
-function toggleScreen(){if(!S.scrSharing){navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:true}).then(function(stream){S.scrSharing=true;document.getElementById('bScr').className='cb on';var vt=stream.getVideoTracks()[0];if(S.pc){var sender=S.pc.getSenders().find(function(s){return s.track&&s.track.kind==='video';});if(sender)sender.replaceTrack(vt);}document.getElementById('locVid').srcObject=stream;vt.onended=function(){stopScreen();};toast('Partage d\u2019\u00e9cran actif');}).catch(function(){toast('Partage annul\u00e9');});}else{stopScreen();}}
-function stopScreen(){S.scrSharing=false;document.getElementById('bScr').className='cb off';if(S.ls){var vt=S.ls.getVideoTracks()[0];if(S.pc&&vt){var sender=S.pc.getSenders().find(function(s){return s.track&&s.track.kind==='video';});if(sender)sender.replaceTrack(vt);}document.getElementById('locVid').srcObject=S.ls;}toast('Partage arr\u00eat\u00e9');}
-function toggleRec(){if(!S.recording){var rv=document.getElementById('remVid');if(!rv.srcObject){toast('Pas de flux');return;}try{S.chunks=[];S.mr=new MediaRecorder(rv.srcObject,{mimeType:'video/webm'});S.mr.ondataavailable=function(e){if(e.data.size>0)S.chunks.push(e.data);};S.mr.onstop=function(){var blob=new Blob(S.chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='myvoc-'+Date.now()+'.webm';a.click();toast('Enregistrement sauvegard\u00e9');};S.mr.start(1000);S.recording=true;document.getElementById('bRec').className='cb on';toast('Enregistrement d\u00e9marr\u00e9');}catch(e){toast('Non support\u00e9');}}else{if(S.mr)S.mr.stop();S.recording=false;document.getElementById('bRec').className='cb off';toast('Enregistrement arr\u00eat\u00e9');}}
-function toggleBlur(){S.blurOn=!S.blurOn;document.getElementById('locVid').style.filter=S.blurOn?'blur(8px)':'';document.getElementById('bBlur').className='cb '+(S.blurOn?'on':'off');toast('Flou '+(S.blurOn?'ON':'OFF'));}
-function toggleChat(){S.chatVis=!S.chatVis;document.getElementById('chatP').style.display=S.chatVis?'flex':'none';document.getElementById('bChat').className='cb '+(S.chatVis?'on':'off');}
-function toggleSet(){S.setVis=!S.setVis;document.getElementById('setP').classList.toggle('hidden',!S.setVis);document.getElementById('bSet').className='cb '+(S.setVis?'on':'off');}
-function toggleFs(){if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(function(){});else document.exitFullscreen();}
-
-function sendChat(){var inp=document.getElementById('chatIn'),txt=inp.value.trim();if(!txt)return;if(!S.dc||S.dc.readyState!=='open'){toast('Canal indisponible');return;}var time=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});S.dc.send(JSON.stringify({type:'chat',text:txt,time:time}));addMsg(txt,true,time);inp.value='';}
-function addMsg(text,me,time){var c=document.getElementById('chatMsgs'),d=document.createElement('div');d.className='msg '+(me?'me':'them');var b=document.createElement('div');b.className='mbub';b.textContent=text;var t=document.createElement('div');t.className='mtime';t.textContent=time;d.appendChild(b);d.appendChild(t);c.appendChild(d);c.scrollTop=c.scrollHeight;if(!me)toast('Nouveau message');}
-
-function endCall(){cleanup();show('sh');toast('Appel termin\u00e9');}
-function cancel(){cleanup();show('sh');}
-function cleanup(){[S.tTimer,S.tStats,S.tKA,S.tCode].forEach(function(t){if(t)clearInterval(t);});S.tTimer=S.tStats=S.tKA=S.tCode=null;WL.disable();if(S.recording&&S.mr){S.mr.stop();S.recording=false;}if(S.ls)S.ls.getTracks().forEach(function(t){t.stop();});if(S.pc)S.pc.close();S.pc=null;S.ls=null;S.dc=null;S.t0=null;S.scrSharing=false;var rv=document.getElementById('remVid'),lv=document.getElementById('locVid');if(rv){rv.srcObject=null;rv.style.display='none';}if(lv)lv.srcObject=null;document.getElementById('rph').style.display='flex';document.getElementById('chatMsgs').innerHTML='';['hostOffer','hostAns','clientOffer','clientAns'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});['hostSDP','clientSDP','wCode','clientAnsSection'].forEach(function(id){var el=document.getElementById(id);if(el)el.classList.add('hidden');});document.getElementById('btnCopyAns').classList.add('hidden');[1,2,3,4].forEach(function(i){step(i,'');});}
-
-function populateDevices(){navigator.mediaDevices.enumerateDevices().then(function(devs){var cs=document.getElementById('camSel'),ms=document.getElementById('micSel');devs.forEach(function(d){var o=document.createElement('option');o.value=d.deviceId;if(d.kind==='videoinput'){o.text=d.label||('Cam '+(cs.length+1));cs.appendChild(o);}if(d.kind==='audioinput'){o.text=d.label||('Micro '+(ms.length+1));ms.appendChild(o);}});}).catch(function(){});}
-
-function initDrag(){var el=document.getElementById('locVid'),dr=false,ox=0,oy=0;el.addEventListener('mousedown',function(e){dr=true;ox=e.clientX-el.offsetLeft;oy=e.clientY-el.offsetTop;e.preventDefault();});document.addEventListener('mousemove',function(e){if(!dr)return;var p=el.parentElement;el.style.right='auto';el.style.bottom='auto';el.style.left=Math.max(0,Math.min(e.clientX-ox,p.offsetWidth-el.offsetWidth))+'px';el.style.top=Math.max(0,Math.min(e.clientY-oy,p.offsetHeight-el.offsetHeight))+'px';});document.addEventListener('mouseup',function(){dr=false;});}
-
-// Copie robuste — fonctionne sur Android file:// et content://
+/*
+ * ── COPIE ROBUSTE ─────────────────────────────────────────
+ * navigator.clipboard ne marche qu'en HTTPS.
+ * On utilise execCommand('copy') comme fallback pour
+ * Android avec file:// ou content://.
+ */
 function copyText(text, label) {
-  // Méthode 1 : Clipboard API moderne
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function() {
-      toast((label || 'Texte') + ' copié');
-    }).catch(function() {
-      fallbackCopy(text, label);
-    });
+    navigator.clipboard.writeText(text)
+      .then(function() { toast((label||'Texte') + ' copi\u00e9'); })
+      .catch(function() { fallbackCopy(text, label); });
   } else {
     fallbackCopy(text, label);
   }
 }
 function fallbackCopy(text, label) {
-  // Méthode 2 : textarea + execCommand (fonctionne sur Android file:// / content://)
   var ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
   document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
-  // Pour iOS/Android : setSelectionRange
-  ta.setSelectionRange(0, text.length);
+  ta.focus(); ta.select();
+  ta.setSelectionRange(0, text.length); // Nécessaire sur iOS/Android
   var ok = false;
   try { ok = document.execCommand('copy'); } catch(e) {}
   document.body.removeChild(ta);
-  if (ok) {
-    toast((label || 'Texte') + ' copié');
+  toast(ok ? (label||'Texte') + ' copi\u00e9' : 'Appuyez longuement pour copier');
+}
+
+// Partage via l'API native du téléphone (WhatsApp, SMS, etc.)
+function shareText(text, label) {
+  if (navigator.share) {
+    navigator.share({ title: "my'voc", text: text }).catch(function(){ copyText(text, label); });
   } else {
-    // Dernier recours : afficher le texte pour copie manuelle
-    toast('Appuyez longuement pour copier');
+    copyText(text, label);
   }
 }
 
-document.addEventListener('DOMContentLoaded',function(){
-  populateDevices(); initDrag();
-  document.getElementById('btnCreate').addEventListener('click',function(){S.code=genCode();document.getElementById('genCode').textContent=S.code;openM('mCreate');});
-  document.getElementById('btnJoin').addEventListener('click',function(){document.getElementById('joinIn').value='';openM('mJoin');});
-  document.getElementById('mCreateClose').addEventListener('click',function(){closeM('mCreate');});
-  document.getElementById('mJoinClose').addEventListener('click',function(){closeM('mJoin');});
-  document.getElementById('btnCopyCode').addEventListener('click',function(){copyText(S.code,'Code');});
-  document.getElementById('btnShareCode').addEventListener('click',function(){var txt="my'voc \u2014 code\u00a0: "+S.code;if(navigator.share)navigator.share({title:"my'voc",text:txt}).catch(function(){copyText(txt,'Lien');});else copyText(txt,'Lien');});
-  document.getElementById('btnStartHost').addEventListener('click',startHost);
-  document.getElementById('joinIn').addEventListener('input',function(){this.value=this.value.toUpperCase();});
-  document.getElementById('joinIn').addEventListener('keydown',function(e){if(e.key==='Enter')startJoin();});
-  document.getElementById('btnStartJoin').addEventListener('click',startJoin);
-  document.getElementById('btnCopyOffer').addEventListener('click',function(){copyText(document.getElementById('hostOffer').value,'Offre');});
-  document.getElementById('btnProcAns').addEventListener('click',procAnswer);
-  document.getElementById('btnProcOffer').addEventListener('click',procOffer);
-  document.getElementById('btnCopyAns').addEventListener('click',function(){copyText(document.getElementById('clientAns').value,'R\u00e9ponse');});
-  document.getElementById('btnCancel').addEventListener('click',cancel);
-  document.getElementById('bMic').addEventListener('click',toggleMic);
-  document.getElementById('bCam').addEventListener('click',toggleCam);
-  document.getElementById('bNoise').addEventListener('click',toggleNoise);
-  document.getElementById('bScr').addEventListener('click',toggleScreen);
-  document.getElementById('bRec').addEventListener('click',toggleRec);
-  document.getElementById('bBlur').addEventListener('click',toggleBlur);
-  document.getElementById('bChat').addEventListener('click',toggleChat);
-  document.getElementById('bSet').addEventListener('click',toggleSet);
-  document.getElementById('bEnd').addEventListener('click',endCall);
-  document.getElementById('bSendChat').addEventListener('click',sendChat);
-  document.getElementById('chatIn').addEventListener('keydown',function(e){if(e.key==='Enter')sendChat();});
-  document.getElementById('togHD').addEventListener('click',function(){this.classList.toggle('on');});
-  document.getElementById('togEC').addEventListener('click',function(){this.classList.toggle('on');});
-  document.getElementById('volRange').addEventListener('input',function(){var v=document.getElementById('remVid');if(v)v.volume=this.value/100;});
-  document.addEventListener('keydown',function(e){if(!S.t0)return;if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.key==='m')toggleMic();if(e.key==='v')toggleCam();if(e.key==='s')toggleScreen();if(e.key==='c')toggleChat();if(e.key==='q'||e.key==='Escape'){if(confirm("Terminer l\u2019appel ?"))endCall();}});
+/*
+ * ══════════════════════════════════════════════════════════
+ *  ACCÈS CAMÉRA & MICRO
+ *  On demande la HD en premier, et si ça échoue (pas de caméra)
+ *  on tente audio seulement.
+ * ══════════════════════════════════════════════════════════
+ */
+function initMedia() {
+  return navigator.mediaDevices.getUserMedia({
+    video: { width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} },
+    audio: { echoCancellation:true, noiseSuppression:false, autoGainControl:true }
+  }).then(function(stream) {
+    S.ls = stream;
+    document.getElementById('locVid').srcObject = stream;
+    toast('Cam\u00e9ra & micro activ\u00e9s');
+  }).catch(function() {
+    // Pas de caméra ? On essaie avec audio seulement
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        S.ls = stream;
+        document.getElementById('locVid').srcObject = stream;
+        toast('Micro activ\u00e9 (pas de cam\u00e9ra)');
+      });
+  });
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  CRÉATION DE LA CONNEXION PEER-TO-PEER (WebRTC)
+ *
+ *  RTCPeerConnection = l'objet central de WebRTC.
+ *  Il gère le chiffrement DTLS-SRTP, les flux vidéo/audio,
+ *  et la traversée des NAT via ICE.
+ * ══════════════════════════════════════════════════════════
+ */
+function createPC() {
+  var pc = new RTCPeerConnection(ICE);
+  S.pc = pc;
+
+  // Ajoute les pistes audio/vidéo locales à la connexion
+  if (S.ls) S.ls.getTracks().forEach(function(t){ pc.addTrack(t, S.ls); });
+
+  // Création du canal de données pour le chat chiffré
+  // L'hôte crée le canal, l'invité le reçoit via ondatachannel
+  if (S.isHost) {
+    var dc = pc.createDataChannel('chat', { ordered: true });
+    setupDC(dc);
+  } else {
+    pc.ondatachannel = function(e) { setupDC(e.channel); };
+  }
+
+  // Quand on reçoit le flux vidéo de l'interlocuteur
+  pc.ontrack = function(e) {
+    var v = document.getElementById('remVid');
+    if (!v.srcObject) v.srcObject = new MediaStream();
+    v.srcObject.addTrack(e.track);
+    v.style.display = 'block';
+    document.getElementById('rph').style.display = 'none';
+    toast('Connexion vid\u00e9o \u00e9tablie');
+  };
+
+  // Surveillance de l'état de la connexion ICE
+  pc.oniceconnectionstatechange = function() {
+    var st = pc.iceConnectionState;
+    if (st === 'connected' || st === 'completed') {
+      // Connexion réussie → on passe à l'écran d'appel
+      step(3, 'done'); step(4, 'act');
+      setTimeout(function(){ step(4, 'done'); onConnected(); }, 500);
+    } else if (st === 'failed') {
+      toast('Connexion \u00e9chou\u00e9e — tentative de reconnexion\u2026');
+      try { pc.restartIce(); } catch(e){}
+    } else if (st === 'disconnected') {
+      toast('Connexion interrompue\u2026');
+      // On attend 3s avant de forcer une reconnexion
+      setTimeout(function(){
+        if (pc.iceConnectionState === 'disconnected') try { pc.restartIce(); } catch(e){}
+      }, 3000);
+    }
+  };
+
+  return pc;
+}
+
+/*
+ * ── ATTENTE DE LA FIN DE LA COLLECTE ICE ──────────────────
+ * Avant d'envoyer l'offre/réponse SDP, on attend que WebRTC
+ * ait fini de collecter tous les candidats ICE (adresses réseau
+ * possibles). On attend max 4 secondes.
+ */
+function waitICE() {
+  return new Promise(function(res) {
+    if (S.pc.iceGatheringState === 'complete') { res(); return; }
+    S.pc.addEventListener('icegatheringstatechange', function() {
+      if (S.pc.iceGatheringState === 'complete') res();
+    });
+    setTimeout(res, 4000); // Timeout de sécurité
+  });
+}
+
+/*
+ * ── CONFIGURATION DU DATA CHANNEL (chat) ──────────────────
+ * Le DataChannel permet d'envoyer des messages texte chiffrés
+ * directement entre les deux appareils (pas de serveur).
+ * On l'utilise pour le chat ET pour les pings keep-alive.
+ */
+function setupDC(dc) {
+  S.dc = dc;
+  dc.onopen = function(){ toast('Canal chiffr\u00e9 ouvert'); };
+  dc.onmessage = function(e) {
+    var m = JSON.parse(e.data);
+    if (m.type === 'chat')   addMsg(m.text, false, m.time);
+    if (m.type === 'react')  showFloatReact(m.emoji, false); // Réaction reçue de l'autre
+    if (m.type === 'ping')   dc.send(JSON.stringify({type:'pong', ts:m.ts}));
+    if (m.type === 'pong')   updateLat(Date.now() - m.ts);
+  };
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  FLUX HÔTE — CRÉER L'APPEL
+ *
+ *  1. Lance la caméra/micro
+ *  2. Crée la connexion WebRTC
+ *  3. Génère une offre SDP
+ *  4. Attend la fin de la collecte ICE
+ *  5. Encode l'offre en base64 → affiche le CODE à envoyer
+ * ══════════════════════════════════════════════════════════
+ */
+function startHost() {
+  closeM('mCreate');
+  S.isHost = true;
+  show('sw');
+  document.getElementById('wTitle').textContent = 'Cr\u00e9ation de l\u2019appel\u2026';
+  document.getElementById('wDesc').textContent = 'G\u00e9n\u00e9ration du code en cours';
+  step(1, 'done');
+
+  initMedia().then(function() {
+    createPC();
+    step(2, 'act');
+    // Crée l'offre SDP (description de la session)
+    return S.pc.createOffer({ offerToReceiveAudio:true, offerToReceiveVideo:true });
+  }).then(function(offer) {
+    return S.pc.setLocalDescription(offer);
+  }).then(function() {
+    // Attend que tous les candidats ICE soient collectés
+    return waitICE();
+  }).then(function() {
+    // Encode l'offre complète (avec candidats ICE) en base64
+    var code = sdpToCode(S.pc.localDescription);
+    document.getElementById('hostCodeTxt').textContent = code;
+    document.getElementById('hostSection').classList.remove('hidden');
+    step(2, 'done');
+    toast('Code g\u00e9n\u00e9r\u00e9 \u2014 envoyez-le \u00e0 votre correspondant');
+    // Lance le compte à rebours de 10 minutes sur le code
+    startCodeCountdown();
+  }).catch(function(e) {
+    toast('Erreur\u00a0: ' + e.message);
+    cancel();
+  });
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  FLUX INVITÉ — REJOINDRE L'APPEL
+ *
+ *  1. Lance la caméra/micro
+ *  2. Crée la connexion WebRTC
+ *  3. Décode le code reçu → obtient l'offre SDP de l'hôte
+ *  4. Génère une réponse SDP
+ *  5. Encode la réponse → affiche le CODE RETOUR à envoyer
+ * ══════════════════════════════════════════════════════════
+ */
+function startJoin() {
+  // Récupère le code collé dans la modale
+  var code = document.getElementById('joinCodeInput').value.trim();
+  if (!code) { toast('Collez le code d\u2019abord'); return; }
+
+  S.isHost = false;
+  closeM('mJoin');
+  show('sw');
+  document.getElementById('wTitle').textContent = 'Connexion en cours\u2026';
+  document.getElementById('wDesc').textContent = 'Traitement du code';
+  step(1, 'done');
+
+  var offerSdp;
+  try {
+    offerSdp = codeToSdp(code); // Décode le code base64 → SDP
+  } catch(e) {
+    toast('Code invalide \u2014 v\u00e9rifiez qu\u2019il est complet');
+    show('sh'); return;
+  }
+
+  initMedia().then(function() {
+    createPC();
+    step(2, 'act');
+    // Applique l'offre de l'hôte comme description distante
+    return S.pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+  }).then(function() {
+    // Génère notre réponse
+    return S.pc.createAnswer();
+  }).then(function(answer) {
+    return S.pc.setLocalDescription(answer);
+  }).then(function() {
+    return waitICE();
+  }).then(function() {
+    // Encode la réponse → code retour à envoyer à l'hôte
+    var returnCode = sdpToCode(S.pc.localDescription);
+    document.getElementById('clientReturnTxt').textContent = returnCode;
+    document.getElementById('clientSection').classList.remove('hidden');
+    document.getElementById('clientReturnSection').classList.remove('hidden');
+    step(2, 'done'); step(3, 'act');
+    toast('Code retour g\u00e9n\u00e9r\u00e9 \u2014 envoyez-le \u00e0 votre correspondant');
+  }).catch(function(e) {
+    toast('Erreur\u00a0: ' + e.message);
+    cancel();
+  });
+}
+
+/*
+ * ── L'HÔTE REÇOIT LE CODE RETOUR ──────────────────────────
+ * L'hôte colle le code retour de l'invité.
+ * On le décode et on l'applique comme description distante.
+ * ICE prend le relais pour établir la connexion.
+ */
+function confirmReturn() {
+  var code = document.getElementById('hostReturnInput').value.trim();
+  if (!code) { toast('Collez le code retour d\u2019abord'); return; }
+  var answerSdp;
+  try {
+    answerSdp = codeToSdp(code);
+  } catch(e) {
+    toast('Code retour invalide \u2014 v\u00e9rifiez qu\u2019il est complet');
+    return;
+  }
+  // ✅ Fix suggéré par un ami : on attend la promesse setRemoteDescription
+  // pour capturer les erreurs et mettre à jour les étapes au bon moment.
+  S.pc.setRemoteDescription(new RTCSessionDescription(answerSdp))
+    .then(function() {
+      step(3, 'act');
+      toast('Connexion en cours\u2026');
+    })
+    .catch(function(e) {
+      toast('Erreur lors de la connexion\u00a0: ' + e.message);
+    });
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  APPEL CONNECTÉ
+ *  Appelé quand ICE est établi. Lance le chrono, les stats,
+ *  le keep-alive et affiche l'écran d'appel.
+ * ══════════════════════════════════════════════════════════
+ */
+function onConnected() {
+  if (S.t0) return; // Déjà connecté, on ignore
+  S.t0 = Date.now();
+  show('sc');
+  WL.enable();       // Active l'anti-coupure Android
+  startTimer();
+  startStats();
+  startKA();
+  toast('Appel chiffr\u00e9 E2E \u00e9tabli');
+}
+
+/*
+ * ── COMPTE À REBOURS DU CODE (10 min) ─────────────────────
+ * Affiche le temps restant avant expiration du code offre.
+ * Après 10 min, le code SDP WebRTC n'est plus forcément
+ * valide (les candidats ICE peuvent expirer).
+ */
+function startCodeCountdown() {
+  var secs = 600; // 10 minutes
+  var el = document.getElementById('codeExpiry');
+  if (!el) return;
+  // Stocke l'intervalle pour pouvoir l'arrêter plus tard
+  if (S.tCode) clearInterval(S.tCode);
+  S.tCode = setInterval(function() {
+    secs--;
+    var m   = String(Math.floor(secs / 60)).padStart(2, '0');
+    var s   = String(secs % 60).padStart(2, '0');
+    if (el) el.textContent = m + ':' + s;
+    if (secs <= 0) {
+      clearInterval(S.tCode);
+      if (el) { el.textContent = 'expir\u00e9'; el.style.color = '#c0392b'; }
+      toast('Code expir\u00e9 \u2014 red\u00e9marrez l\u2019appel si besoin');
+    } else if (secs <= 60) {
+      // Passe en rouge la dernière minute
+      if (el) el.style.color = '#c0392b';
+    }
+  }, 1000);
+}
+
+/*
+ * ── CHRONOMÈTRE ───────────────────────────────────────────
+ * Met à jour l'affichage toutes les secondes.
+ * Format MM:SS ou HH:MM:SS si > 1 heure.
+ */
+function startTimer() {
+  var el = document.getElementById('cTimer');
+  S.tTimer = setInterval(function() {
+    var s   = Math.floor((Date.now() - S.t0) / 1000);
+    var h   = String(Math.floor(s / 3600)).padStart(2,'0');
+    var m   = String(Math.floor((s % 3600) / 60)).padStart(2,'0');
+    var sec = String(s % 60).padStart(2,'0');
+    el.textContent = s >= 3600 ? h+':'+m+':'+sec : m+':'+sec;
+  }, 1000);
+}
+
+/*
+ * ── KEEP-ALIVE TOUTES LES 15 SECONDES ─────────────────────
+ * Envoie un ping par le DataChannel pour maintenir la
+ * connexion ICE active. Aussi vérifie le wake lock et
+ * tente une reconnexion si la connexion est perdue.
+ */
+function startKA() {
+  S.tKA = setInterval(function() {
+    // Ping pour maintenir ICE vivant
+    if (S.dc && S.dc.readyState === 'open') {
+      try { S.dc.send(JSON.stringify({ type:'ping', ts:Date.now() })); } catch(e){}
+    }
+    // Ré-acquiert le wake lock si Android l'a relâché
+    if (document.visibilityState === 'visible' && !WL.sen) WL.enable();
+    // Tente une reconnexion si ICE est coupé
+    if (S.pc) {
+      var st = S.pc.iceConnectionState;
+      if (st === 'disconnected' || st === 'failed') {
+        try { S.pc.restartIce(); } catch(e){}
+      }
+    }
+  }, 15000);
+}
+
+/*
+ * ── STATISTIQUES RÉSEAU ────────────────────────────────────
+ * Récupère les stats WebRTC toutes les 2 secondes :
+ * FPS, résolution vidéo, latence (round-trip time).
+ */
+function startStats() {
+  S.tStats = setInterval(function() {
+    if (!S.pc) return;
+    S.pc.getStats().then(function(stats) {
+      stats.forEach(function(r) {
+        // Stats de la vidéo entrante
+        if (r.type === 'inbound-rtp' && r.kind === 'video') {
+          if (r.framesPerSecond) document.getElementById('fps').textContent = Math.round(r.framesPerSecond);
+          if (r.frameWidth) document.getElementById('resol').textContent = r.frameWidth+'x'+r.frameHeight;
+        }
+        // Latence depuis les stats de paire ICE
+        if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.currentRoundTripTime !== undefined) {
+          updateLat(r.currentRoundTripTime * 1000);
+        }
+      });
+    }).catch(function(){});
+  }, 2000);
+}
+
+// Met à jour l'affichage de la latence et les barres de signal
+function updateLat(ms) {
+  var el = document.getElementById('latency');
+  el.textContent = Math.round(ms) + 'ms';
+  var good = ms < 100, ok = ms < 250;
+  for (var i = 1; i <= 5; i++) {
+    var b = document.getElementById('q' + i);
+    if (!b) continue;
+    var lv = good ? 5 : ok ? 3 : 1;
+    b.className = 'qb' + (i <= lv ? (good ? ' good' : ok ? ' warn' : ' bad') : '');
+  }
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  CONTRÔLES PENDANT L'APPEL
+ * ══════════════════════════════════════════════════════════
+ */
+
+// Active/désactive le micro
+function toggleMic() {
+  S.micOn = !S.micOn;
+  if (S.ls) S.ls.getAudioTracks().forEach(function(t){ t.enabled = S.micOn; });
+  document.getElementById('bMic').className = 'cb ' + (S.micOn ? 'on' : 'off');
+  toast(S.micOn ? 'Micro activ\u00e9' : 'Micro coup\u00e9');
+}
+
+// Active/désactive la caméra
+function toggleCam() {
+  S.camOn = !S.camOn;
+  if (S.ls) S.ls.getVideoTracks().forEach(function(t){ t.enabled = S.camOn; });
+  document.getElementById('bCam').className = 'cb ' + (S.camOn ? 'on' : 'off');
+  toast(S.camOn ? 'Cam\u00e9ra activ\u00e9e' : 'Cam\u00e9ra coup\u00e9e');
+}
+
+// Réduction de bruit (toggle visuel — la vraie réduction est gérée par getUserMedia)
+function toggleNoise() {
+  var b = document.getElementById('bNoise');
+  var on = b.classList.contains('off');
+  b.className = 'cb ' + (on ? 'on' : 'off');
+  toast('R\u00e9duction bruit ' + (on ? 'ON' : 'OFF'));
+}
+
+// Partage d'écran : remplace la piste vidéo locale par le flux écran
+function toggleScreen() {
+  if (!S.scrSharing) {
+    navigator.mediaDevices.getDisplayMedia({ video:{ cursor:'always' }, audio:true })
+    .then(function(stream) {
+      S.scrSharing = true;
+      document.getElementById('bScr').className = 'cb on';
+      var vt = stream.getVideoTracks()[0];
+      // Remplace la piste vidéo dans la connexion WebRTC
+      if (S.pc) {
+        var sender = S.pc.getSenders().find(function(s){ return s.track && s.track.kind === 'video'; });
+        if (sender) sender.replaceTrack(vt);
+      }
+      document.getElementById('locVid').srcObject = stream;
+      vt.onended = function(){ stopScreen(); }; // Arrêt automatique quand l'utilisateur clique "Arrêter"
+      toast('Partage d\u2019\u00e9cran actif');
+    }).catch(function(){ toast('Partage annul\u00e9'); });
+  } else { stopScreen(); }
+}
+
+// Arrête le partage d'écran et restaure la caméra
+function stopScreen() {
+  S.scrSharing = false;
+  document.getElementById('bScr').className = 'cb off';
+  if (S.ls) {
+    var vt = S.ls.getVideoTracks()[0];
+    if (S.pc && vt) {
+      var sender = S.pc.getSenders().find(function(s){ return s.track && s.track.kind === 'video'; });
+      if (sender) sender.replaceTrack(vt);
+    }
+    document.getElementById('locVid').srcObject = S.ls;
+  }
+  toast('Partage arr\u00eat\u00e9');
+}
+
+// Enregistrement vidéo de l'interlocuteur (flux distant)
+function toggleRec() {
+  if (!S.recording) {
+    var rv = document.getElementById('remVid');
+    if (!rv.srcObject) { toast('Pas de flux \u00e0 enregistrer'); return; }
+    try {
+      S.chunks = [];
+      S.mr = new MediaRecorder(rv.srcObject, { mimeType:'video/webm' });
+      S.mr.ondataavailable = function(e){ if (e.data.size > 0) S.chunks.push(e.data); };
+      S.mr.onstop = function() {
+        // Crée un fichier .webm téléchargeable
+        var blob = new Blob(S.chunks, {type:'video/webm'});
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href = url; a.download = 'myvoc-' + Date.now() + '.webm'; a.click();
+        toast('Enregistrement sauvegard\u00e9');
+      };
+      S.mr.start(1000); // Découpe en morceaux de 1 seconde
+      S.recording = true;
+      document.getElementById('bRec').className = 'cb on';
+      toast('Enregistrement d\u00e9marr\u00e9');
+    } catch(e) { toast('Enregistrement non support\u00e9'); }
+  } else {
+    if (S.mr) S.mr.stop();
+    S.recording = false;
+    document.getElementById('bRec').className = 'cb off';
+    toast('Enregistrement arr\u00eat\u00e9');
+  }
+}
+
+// Flou de la vidéo locale (visuel seulement, ne s'applique pas à l'interlocuteur)
+function toggleBlur() {
+  S.blurOn = !S.blurOn;
+  document.getElementById('locVid').style.filter = S.blurOn ? 'blur(8px)' : '';
+  document.getElementById('bBlur').className = 'cb ' + (S.blurOn ? 'on' : 'off');
+  toast('Flou ' + (S.blurOn ? 'ON' : 'OFF'));
+}
+
+/*
+ * ── BASCULE CAMÉRA AVANT/ARRIÈRE ─────────────────────────
+ * Sur mobile, alterne entre la caméra selfie (user) et la
+ * caméra arrière (environment). Remplace la piste vidéo
+ * dans la connexion WebRTC sans couper l'appel.
+ */
+function flipCamera() {
+  // Inverse le mode
+  S.facingMode = S.facingMode === 'user' ? 'environment' : 'user';
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { exact: S.facingMode } },
+    audio: false  // On ne touche pas à l'audio
+  }).then(function(stream) {
+    var newTrack = stream.getVideoTracks()[0];
+    // Remplace la piste dans la connexion WebRTC (sans renegociation)
+    if (S.pc) {
+      var sender = S.pc.getSenders().find(function(s){ return s.track && s.track.kind === 'video'; });
+      if (sender) sender.replaceTrack(newTrack);
+    }
+    // Remplace aussi dans le stream local et l'aperçu
+    if (S.ls) {
+      var old = S.ls.getVideoTracks()[0];
+      if (old) { S.ls.removeTrack(old); old.stop(); }
+      S.ls.addTrack(newTrack);
+    }
+    document.getElementById('locVid').srcObject = S.ls || stream;
+    var label = S.facingMode === 'user' ? 'Caméra selfie' : 'Caméra arrière';
+    toast(label);
+    document.getElementById('bFlip').className = 'cb ' + (S.facingMode === 'environment' ? 'on' : 'off');
+  }).catch(function() {
+    // Si exact échoue (certains appareils), on essaie sans exact
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: S.facingMode } })
+    .then(function(stream){
+      var newTrack = stream.getVideoTracks()[0];
+      if (S.pc) {
+        var sender = S.pc.getSenders().find(function(s){ return s.track && s.track.kind === 'video'; });
+        if (sender) sender.replaceTrack(newTrack);
+      }
+      document.getElementById('locVid').srcObject = stream;
+      toast(S.facingMode === 'user' ? 'Caméra selfie' : 'Caméra arrière');
+    }).catch(function(){ toast('Impossible de basculer la caméra'); S.facingMode = S.facingMode === 'user' ? 'environment' : 'user'; });
+  });
+}
+
+// Affiche/cache le panneau chat
+function toggleChat() {
+  S.chatVis = !S.chatVis;
+  document.getElementById('chatP').style.display = S.chatVis ? 'flex' : 'none';
+  document.getElementById('bChat').className = 'cb ' + (S.chatVis ? 'on' : 'off');
+}
+
+// Affiche/cache le panneau paramètres
+function toggleSet() {
+  S.setVis = !S.setVis;
+  document.getElementById('setP').classList.toggle('hidden', !S.setVis);
+  document.getElementById('bSet').className = 'cb ' + (S.setVis ? 'on' : 'off');
+}
+
+// Plein écran
+function toggleFs() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
+  else document.exitFullscreen();
+}
+
+/*
+ * ── RÉACTIONS RAPIDES ────────────────────────────────────
+ * Envoie un emoji via le DataChannel.
+ * L'emoji apparaît en flottant sur la vidéo des deux côtés.
+ * me=true  → emoji à droite (envoyé par moi)
+ * me=false → emoji à gauche (reçu de l'autre)
+ */
+function sendReact(emoji) {
+  // Affiche localement
+  showFloatReact(emoji, true);
+  // Envoie à l'interlocuteur si connecté
+  if (S.dc && S.dc.readyState === 'open') {
+    try { S.dc.send(JSON.stringify({ type:'react', emoji:emoji })); } catch(e){}
+  }
+}
+
+function showFloatReact(emoji, isMe) {
+  var area = document.querySelector('.vid-area');
+  if (!area) return;
+  var el = document.createElement('div');
+  el.className = 'float-react';
+  el.textContent = emoji;
+  // Positionne aléatoirement sur la largeur selon qui envoie
+  var xMin = isMe ? 60 : 10;
+  var xMax = isMe ? 90 : 40;
+  el.style.left = (xMin + Math.random() * (xMax - xMin)) + '%';
+  area.appendChild(el);
+  // Retire l'élément du DOM après l'animation (2s)
+  setTimeout(function(){ el.remove(); }, 2100);
+}
+
+/*
+ * ── CHAT CHIFFRÉ ─────────────────────────────────────────
+ * Les messages passent par le DataChannel WebRTC,
+ * donc ils sont chiffrés E2E automatiquement.
+ */
+function sendChat() {
+  var inp = document.getElementById('chatIn');
+  var txt = inp.value.trim();
+  if (!txt) return;
+  if (!S.dc || S.dc.readyState !== 'open') { toast('Canal indisponible'); return; }
+  var time = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  S.dc.send(JSON.stringify({ type:'chat', text:txt, time:time }));
+  addMsg(txt, true, time);
+  inp.value = '';
+}
+
+// Ajoute un message dans la zone de chat
+function addMsg(text, me, time) {
+  var c = document.getElementById('chatMsgs');
+  var d = document.createElement('div');
+  d.className = 'msg ' + (me ? 'me' : 'them');
+  var b = document.createElement('div'); b.className = 'mbub'; b.textContent = text;
+  var t = document.createElement('div'); t.className = 'mtime'; t.textContent = time;
+  d.appendChild(b); d.appendChild(t);
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight; // Auto-scroll vers le bas
+  if (!me) toast('Nouveau message');
+}
+
+/*
+ * ── FIN D'APPEL & NETTOYAGE ───────────────────────────────
+ * Arrête tout proprement : médias, connexion, intervalles.
+ */
+function endCall() { cleanup(); show('sh'); toast('Appel termin\u00e9'); }
+function cancel()  { cleanup(); show('sh'); }
+
+function cleanup() {
+  // Arrête tous les intervalles
+  [S.tTimer, S.tStats, S.tKA, S.tCode].forEach(function(t){ if (t) clearInterval(t); });
+  S.tTimer = S.tStats = S.tKA = S.tCode = null;
+
+  WL.disable(); // Relâche le wake lock
+
+  if (S.recording && S.mr) { S.mr.stop(); S.recording = false; }
+
+  // Arrête toutes les pistes média (micro, caméra)
+  if (S.ls) S.ls.getTracks().forEach(function(t){ t.stop(); });
+
+  // Ferme la connexion WebRTC
+  if (S.pc) S.pc.close();
+
+  // Remet toutes les variables à zéro
+  S.pc = null; S.ls = null; S.dc = null; S.t0 = null; S.scrSharing = false;
+
+  // Remet l'interface vidéo à l'état initial
+  var rv = document.getElementById('remVid'), lv = document.getElementById('locVid');
+  if (rv) { rv.srcObject = null; rv.style.display = 'none'; }
+  if (lv)   lv.srcObject = null;
+  document.getElementById('rph').style.display = 'flex';
+
+  // Vide le chat
+  // ✅ Fix suggéré par un ami : replaceChildren() est plus propre
+  // que innerHTML='' car il ne passe pas par le parseur HTML.
+  var cm = document.getElementById('chatMsgs');
+  while (cm.firstChild) cm.removeChild(cm.firstChild);
+
+  // Cache les sections d'échange de code
+  ['hostSection','clientSection','clientReturnSection'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+  ['hostReturnInput','clientCodeInput','joinCodeInput'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // Remet les indicateurs d'étapes à zéro
+  [1,2,3,4].forEach(function(i){ step(i,''); });
+}
+
+/*
+ * ── DÉTECTION DES APPAREILS ───────────────────────────────
+ * Remplit les menus déroulants caméra/micro dans les paramètres.
+ * enumerateDevices() retourne tous les périphériques disponibles.
+ */
+function populateDevices() {
+  navigator.mediaDevices.enumerateDevices().then(function(devs) {
+    var cs = document.getElementById('camSel'), ms = document.getElementById('micSel');
+    devs.forEach(function(d) {
+      var o = document.createElement('option');
+      o.value = d.deviceId;
+      if (d.kind === 'videoinput') { o.text = d.label || ('Cam ' + (cs.length+1)); cs.appendChild(o); }
+      if (d.kind === 'audioinput') { o.text = d.label || ('Micro ' + (ms.length+1)); ms.appendChild(o); }
+    });
+  }).catch(function(){});
+}
+
+/*
+ * ── VIDÉO LOCALE DÉPLAÇABLE (drag & drop) ─────────────────
+ * Permet de déplacer la petite fenêtre de sa propre vidéo
+ * n'importe où dans la zone d'appel.
+ */
+function initDrag() {
+  var el = document.getElementById('locVid'), dr = false, ox = 0, oy = 0;
+  el.addEventListener('mousedown', function(e){
+    dr = true; ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop; e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if (!dr) return;
+    var p = el.parentElement;
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+    el.style.left = Math.max(0, Math.min(e.clientX - ox, p.offsetWidth  - el.offsetWidth))  + 'px';
+    el.style.top  = Math.max(0, Math.min(e.clientY - oy, p.offsetHeight - el.offsetHeight)) + 'px';
+  });
+  document.addEventListener('mouseup', function(){ dr = false; });
+}
+
+/*
+ * ══════════════════════════════════════════════════════════
+ *  BRANCHEMENT DES ÉVÉNEMENTS
+ *
+ *  IMPORTANT : On utilise addEventListener au lieu de onclick=""
+ *  dans le HTML. C'est nécessaire pour que ça fonctionne sur
+ *  Android avec le protocole content:// (voir historique bug).
+ *  Tout est branché dans DOMContentLoaded = quand le HTML
+ *  est complètement chargé.
+ * ══════════════════════════════════════════════════════════
+ */
+document.addEventListener('DOMContentLoaded', function() {
+
+  populateDevices();
+  initDrag();
+
+  // ── Accueil ──
+  document.getElementById('btnCreate').addEventListener('click', function() { openM('mCreate'); });
+  document.getElementById('btnJoin').addEventListener('click',   function() {
+    document.getElementById('joinCodeInput').value = '';
+    openM('mJoin');
+  });
+
+  // ── Modale "Créer" ──
+  document.getElementById('mCreateClose').addEventListener('click', function(){ closeM('mCreate'); });
+  document.getElementById('btnStartHost').addEventListener('click', startHost);
+
+  // ── Modale "Rejoindre" ──
+  document.getElementById('mJoinClose').addEventListener('click', function(){ closeM('mJoin'); });
+  document.getElementById('btnStartJoin').addEventListener('click', startJoin);
+
+  // ── Copier / Partager le code offre (hôte) ──
+  document.getElementById('btnCopyOffer').addEventListener('click', function(){
+    copyText(document.getElementById('hostCodeTxt').textContent, 'Code');
+  });
+  document.getElementById('btnShareOffer').addEventListener('click', function(){
+    shareText("my'voc \u2014 code\u00a0: " + document.getElementById('hostCodeTxt').textContent, 'Code');
+  });
+
+  // ── Confirmer le code retour (hôte) ──
+  document.getElementById('btnConfirmReturn').addEventListener('click', confirmReturn);
+
+  // ── Traiter le code reçu (invité) ──
+  document.getElementById('btnProcessCode').addEventListener('click', function(){
+    // L'invité a collé son code dans la modale, on le copie dans la section d'attente
+    var code = document.getElementById('joinCodeInput').value.trim();
+    if (!code) { toast('Collez le code d\u2019abord'); return; }
+    document.getElementById('clientCodeInput').value = code;
+    startJoin();
+  });
+
+  // ── Copier / Partager le code retour (invité) ──
+  document.getElementById('btnCopyReturn').addEventListener('click', function(){
+    copyText(document.getElementById('clientReturnTxt').textContent, 'Code retour');
+  });
+  document.getElementById('btnShareReturn').addEventListener('click', function(){
+    shareText("my'voc \u2014 code retour\u00a0: " + document.getElementById('clientReturnTxt').textContent, 'Code retour');
+  });
+
+  // ── Annuler ──
+  document.getElementById('btnCancel').addEventListener('click', cancel);
+
+  // ── Boutons d'appel ──
+  document.getElementById('bMic').addEventListener('click',   toggleMic);
+  document.getElementById('bCam').addEventListener('click',   toggleCam);
+  document.getElementById('bNoise').addEventListener('click', toggleNoise);
+  document.getElementById('bScr').addEventListener('click',   toggleScreen);
+  document.getElementById('bRec').addEventListener('click',   toggleRec);
+  document.getElementById('bBlur').addEventListener('click',  toggleBlur);
+  // Bascule caméra front/back
+  document.getElementById('bFlip').addEventListener('click',  flipCamera);
+  document.getElementById('bChat').addEventListener('click',  toggleChat);
+  // Réactions rapides — chaque bouton envoie son emoji
+  document.getElementById('r1').addEventListener('click', function(){ sendReact('\uD83D\uDC4D'); });
+  document.getElementById('r2').addEventListener('click', function(){ sendReact('\u2764\uFE0F'); });
+  document.getElementById('r3').addEventListener('click', function(){ sendReact('\uD83D\uDE02'); });
+  document.getElementById('r4').addEventListener('click', function(){ sendReact('\uD83D\uDE2E'); });
+  document.getElementById('r5').addEventListener('click', function(){ sendReact('\uD83D\uDC4F'); });
+  document.getElementById('r6').addEventListener('click', function(){ sendReact('\uD83D\uDD25'); });
+  document.getElementById('bSet').addEventListener('click',   toggleSet);
+  document.getElementById('bEnd').addEventListener('click',   endCall);
+
+  // ── Chat ──
+  document.getElementById('bSendChat').addEventListener('click', sendChat);
+  document.getElementById('chatIn').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') sendChat();
+  });
+
+  // ── Paramètres ──
+  document.getElementById('togHD').addEventListener('click', function(){ this.classList.toggle('on'); });
+  document.getElementById('togEC').addEventListener('click', function(){ this.classList.toggle('on'); });
+  document.getElementById('volRange').addEventListener('input', function(){
+    var v = document.getElementById('remVid');
+    if (v) v.volume = this.value / 100;
+  });
+
+  // ── Raccourcis clavier (pendant l'appel seulement) ──
+  document.addEventListener('keydown', function(e) {
+    if (!S.t0) return; // Pas en appel = on ignore
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'm') toggleMic();
+    if (e.key === 'v') toggleCam();
+    if (e.key === 's') toggleScreen();
+    if (e.key === 'c') toggleChat();
+    if (e.key === 'q' || e.key === 'Escape') {
+      if (confirm('Terminer l\u2019appel\u00a0?')) endCall();
+    }
+  });
+
 });
 
-})();
+})(); // Fin de l'IIFE
 </script>
 </body>
 </html>
