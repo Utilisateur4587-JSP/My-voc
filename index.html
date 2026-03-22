@@ -339,7 +339,7 @@ select option{background:var(--surface2);}
 
 <script>
 // ════════════════════════════════════════════════════════════════
-//  my'voc — v2.4.0
+//  my'voc — v2.5.0
 //  Application d'appel vidéo/audio P2P chiffrée de bout en bout
 //  via WebRTC (PeerJS). Pas de serveur central pour les flux média.
 // ════════════════════════════════════════════════════════════════
@@ -420,62 +420,206 @@ function fmtCode(el) {
 }
 
 
+// ── CONTEXTE AUDIO (Web Audio API) ─────────────────────────────
+// Référence globale au contexte audio et au flux filtré.
+// Le contexte est créé une seule fois et réutilisé pendant toute la session.
+let audioCtx = null;       // AudioContext (moteur de traitement audio)
+let filteredStream = null; // MediaStream contenant la piste audio filtrée
+
+/**
+ * Applique une chaîne de traitement audio (Web Audio API) sur une piste micro brute.
+ * La chaîne filtre les bruits indésirables avant envoi au contact :
+ *
+ *   [Micro brut]
+ *       │
+ *   [Filtre passe-haut 80 Hz]   → supprime les grondements graves (ventilo, basse fréquence)
+ *       │
+ *   [Filtre passe-bas 8000 Hz]  → atténue les sibilances et bruits de clavier aigus
+ *       │
+ *   [Compresseur dynamique]     → nivelle le volume, évite les pics et explosions sonores
+ *       │
+ *   [Destination = MediaStream] → flux filtré prêt pour PeerJS
+ *
+ * @param {MediaStream} rawStream - Le flux brut obtenu par getUserMedia
+ * @returns {MediaStream} Un nouveau flux dont la piste audio est filtrée
+ */
+function applyAudioFilter(rawStream) {
+  // Crée ou réutilise le contexte audio
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Source = la piste micro brute
+  const source = audioCtx.createMediaStreamSource(rawStream);
+
+  // ── Filtre 1 : Passe-haut à 80 Hz ──────────────────────────────
+  // Coupe tout ce qui est en dessous de 80 Hz : grondements de ventilo,
+  // vibrations du bureau, basses fréquences parasites.
+  const highPass = audioCtx.createBiquadFilter();
+  highPass.type = 'highpass';
+  highPass.frequency.value = 80;   // Fréquence de coupure en Hz
+  highPass.Q.value = 0.7;          // Pente douce pour ne pas dénaturer la voix
+
+  // ── Filtre 2 : Passe-bas à 8000 Hz ─────────────────────────────
+  // Coupe les fréquences au-dessus de 8 kHz : clics de clavier, sifflements,
+  // bruits électroniques aigus. La voix humaine est essentiellement < 4 kHz,
+  // on garde donc une marge confortable.
+  const lowPass = audioCtx.createBiquadFilter();
+  lowPass.type = 'lowpass';
+  lowPass.frequency.value = 8000;  // Fréquence de coupure en Hz
+  lowPass.Q.value = 0.7;
+
+  // ── Filtre 3 : Compresseur dynamique ───────────────────────────
+  // Réduit la dynamique du signal : les sons forts sont atténués,
+  // les sons faibles sont maintenus. Effet "radio pro" qui rend la voix
+  // plus stable en volume et réduit l'impact des bruits soudains.
+  const compressor = audioCtx.createDynamicsCompressor();
+  compressor.threshold.value = -24; // En dB : en dessous, pas de compression
+  compressor.knee.value = 6;        // Zone de transition progressive (doux)
+  compressor.ratio.value = 3;       // Rapport de compression 3:1 (léger)
+  compressor.attack.value = 0.003;  // Réaction rapide (3 ms) aux pics
+  compressor.release.value = 0.25;  // Relâchement progressif (250 ms)
+
+  // ── Destination = un nouveau MediaStream ───────────────────────
+  // createMediaStreamDestination() crée un nœud dont la sortie est
+  // un MediaStream standard qu'on peut passer à PeerJS.
+  const dest = audioCtx.createMediaStreamDestination();
+
+  // Branchement en série : source → passe-haut → passe-bas → compresseur → sortie
+  source.connect(highPass);
+  highPass.connect(lowPass);
+  lowPass.connect(compressor);
+  compressor.connect(dest);
+
+  // Construit le flux de sortie final :
+  // - Piste audio = la sortie filtrée par la chaîne Web Audio
+  // - Piste vidéo = conservée intacte depuis le flux brut original
+  const outputStream = new MediaStream();
+  dest.stream.getAudioTracks().forEach(t => outputStream.addTrack(t));
+  rawStream.getVideoTracks().forEach(t => outputStream.addTrack(t));
+
+  filteredStream = outputStream;
+  return outputStream;
+}
+
+
 // ── ACCÈS AUX MÉDIAS (caméra / micro) ───────────────────────────
 /**
- * Demande l'accès à la caméra et/ou au micro selon les options choisies.
+ * Demande l'accès à la caméra et/ou au micro selon les options choisies,
+ * puis applique le filtre audio sur la piste micro obtenue.
  *
- * ⚠️  CORRECTION DE BUG (v2.4.0) :
- * Avant ce correctif, si l'utilisateur ne cochait ni caméra ni micro,
- * la fonction retournait `true` immédiatement SANS jamais appeler
- * `getUserMedia`. Résultat : le navigateur ne demandait jamais
- * la permission à l'utilisateur, et l'appel démarrait sans flux.
+ * ⚠️  CORRECTIONS (v2.4.0 → v2.5.0) :
  *
- * Correctif : si rien n'est coché, on demande quand même le micro
- * en mode "audio seulement" par défaut. Cela force le navigateur
- * à afficher la popup de permission, et garantit un flux audio minimal.
+ * v2.4.0 — Bug "rien coché" :
+ *   Si ni caméra ni micro n'étaient cochés, getUserMedia n'était jamais
+ *   appelé → pas de popup de permission → appel sans flux.
+ *   Correctif : forcer l'audio si rien n'est coché.
  *
- * @returns {Promise<boolean>} true si le flux a été obtenu, false sinon
+ * v2.5.0 — Bug "caméra ignorée" :
+ *   Quand video+audio étaient demandés simultanément avec facingMode:'user',
+ *   certains navigateurs (Firefox, Safari mobile) échouaient silencieusement
+ *   sur la contrainte video et renvoyaient uniquement l'audio.
+ *   Correctif : stratégie de repli en 3 étapes (voir ci-dessous).
+ *
+ * v2.5.0 — Filtre audio :
+ *   Le flux micro brut est désormais traité par une chaîne Web Audio API
+ *   (passe-haut + passe-bas + compresseur) avant d'être transmis au contact.
+ *
+ * @returns {Promise<boolean>} true si au moins un flux a été obtenu, false sinon
  */
 async function getMedia() {
   const h = parseInt(document.getElementById('qsel').value) || 720;
   const wantVideo = mediaOpts.video;
   const wantAudio = mediaOpts.audio;
 
-  // ── BUGFIX : si rien n'est coché, on force l'audio par défaut ──
-  // Avant : if(!c.video && !c.audio) { return true; }  ← NE DEMANDAIT PAS LA PERMISSION
-  // Après : on bascule sur audio=true pour forcer la popup navigateur
-  const forceAudio = !wantVideo && !wantAudio; // Aucune option cochée ?
+  // Si rien n'est coché, on force l'audio par défaut pour garantir
+  // que le navigateur affiche bien la popup de permission (bugfix v2.4.0)
+  const forceAudio = !wantVideo && !wantAudio;
 
-  // Contraintes passées à getUserMedia
-  const c = {
-    video: wantVideo
-      ? { width: { ideal: Math.round(h * 16 / 9) }, height: { ideal: h }, facingMode: 'user' }
-      : false,
-    audio: (wantAudio || forceAudio) // Audio demandé si coché OU si rien n'est coché
-      ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      : false
+  // Contraintes audio avec traitements natifs du navigateur activés
+  // (ces traitements sont complémentaires à notre chaîne Web Audio)
+  const audioConstraints = {
+    echoCancellation: true,   // Annulation d'écho (retour du son du contact)
+    noiseSuppression: true,   // Suppression de bruit native du navigateur
+    autoGainControl: true     // Contrôle automatique du gain
   };
 
-  try {
-    // Demande la permission au navigateur — affiche la popup si nécessaire
-    localStream = await navigator.mediaDevices.getUserMedia(c);
+  // ── Stratégie de repli en 3 étapes pour la caméra (bugfix v2.5.0) ──
+  // Certains navigateurs échouent avec des contraintes vidéo trop strictes.
+  // On essaie du plus précis au plus permissif.
+  const videoConstraints = [
+    // Étape 1 : contraintes complètes avec résolution et orientation caméra
+    { width: { ideal: Math.round(h * 16 / 9) }, height: { ideal: h }, facingMode: 'user' },
+    // Étape 2 : résolution seulement, sans facingMode (compatible Firefox/Safari)
+    { width: { ideal: Math.round(h * 16 / 9) }, height: { ideal: h } },
+    // Étape 3 : aucune contrainte, on accepte n'importe quelle caméra disponible
+    true
+  ];
 
-    // Affiche le flux local dans la petite fenêtre (coin de l'écran d'appel)
-    document.getElementById('lv').srcObject = localStream;
+  let rawStream = null;
 
-    // Met à jour l'état des contrôles selon ce qui a été demandé
-    micOn = wantAudio || forceAudio; // Micro actif si demandé ou forcé
-    camOn = wantVideo;
-
-    return true;
-  } catch (e) {
-    // Diagnostic précis selon le type d'erreur navigateur
-    console.error('getUserMedia error:', e.name, e.message);
-    // NotAllowedError  → permission refusée par l'utilisateur ou le système
-    // NotFoundError    → pas de micro/caméra détecté sur l'appareil
-    // NotReadableError → périphérique déjà utilisé par une autre app
-    return false;
+  if (wantVideo) {
+    // ── Cas avec caméra demandée : on essaie les contraintes par ordre ──
+    for (const vc of videoConstraints) {
+      try {
+        rawStream = await navigator.mediaDevices.getUserMedia({
+          video: vc,
+          audio: (wantAudio || forceAudio) ? audioConstraints : false
+        });
+        break; // Succès → on sort de la boucle
+      } catch (e) {
+        console.warn('getUserMedia tentative échouée:', e.name, '— essai suivant…');
+        // On continue avec les contraintes moins strictes
+      }
+    }
+    if (!rawStream) {
+      // Toutes les tentatives vidéo ont échoué → on tente en audio seul en dernier recours
+      console.warn('Caméra inaccessible, repli sur audio seul.');
+      try {
+        rawStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: audioConstraints
+        });
+        // La caméra n'a pas pu être obtenue, on le signale dans l'état
+        mediaOpts.video = false;
+      } catch (e) {
+        console.error('getUserMedia total fail:', e.name, e.message);
+        return false;
+      }
+    }
+  } else {
+    // ── Cas sans caméra (ou rien coché) : simple appel audio ──
+    try {
+      rawStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: (wantAudio || forceAudio) ? audioConstraints : false
+      });
+    } catch (e) {
+      console.error('getUserMedia error:', e.name, e.message);
+      return false;
+    }
   }
+
+  // ── Application du filtre audio (Web Audio API) ─────────────────
+  // On ne filtre que si le flux contient une piste audio
+  if (rawStream.getAudioTracks().length > 0) {
+    try {
+      localStream = applyAudioFilter(rawStream);
+    } catch (e) {
+      // Si la Web Audio API échoue (très rare), on utilise le flux brut sans filtre
+      console.warn('Web Audio filter failed, using raw stream:', e);
+      localStream = rawStream;
+    }
+  } else {
+    localStream = rawStream; // Flux vidéo seul, pas de filtre à appliquer
+  }
+
+  // Affiche le flux local dans la petite fenêtre (coin de l'écran d'appel)
+  document.getElementById('lv').srcObject = localStream;
+
+  // Met à jour l'état des contrôles
+  micOn = wantAudio || forceAudio;
+  camOn = wantVideo && localStream.getVideoTracks().length > 0;
+
+  return true;
 }
 
 
@@ -927,8 +1071,13 @@ function hangUp() {
   // Libère les pistes média (important pour éteindre l'indicateur caméra/micro)
   localStream?.getTracks().forEach(t => t.stop());
   localStream = null;
+  filteredStream?.getTracks().forEach(t => t.stop());
+  filteredStream = null;
   screenStream?.getTracks().forEach(t => t.stop());
   screenStream = null;
+
+  // Ferme le contexte Web Audio pour libérer les ressources processeur
+  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
 
   // Vide les éléments vidéo
   document.getElementById('rv').srcObject = null;
@@ -1135,7 +1284,7 @@ if (location.protocol !== 'https:' && location.hostname !== 'localhost' && locat
   w.textContent = '⚠ Ce site doit être ouvert en HTTPS pour accéder à la caméra et au micro.';
   document.body.prepend(w);
 }
-// v2.4.0
+// v2.5.0
 </script>
 </body>
 </html>
