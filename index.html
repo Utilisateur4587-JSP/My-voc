@@ -365,13 +365,26 @@ function fmtCode(el){
 // get media
 async function getMedia(){
   const h=parseInt(document.getElementById('qsel').value)||720;
+  // Si rien coché, on demande juste le micro en fallback silencieux
+  // pour que le navigateur déclenche bien la popup de permissions
+  const wantVideo=mediaOpts.video;
+  const wantAudio=mediaOpts.audio;
   const c={
-    video:mediaOpts.video?{width:{ideal:Math.round(h*16/9)},height:{ideal:h},facingMode:'user'}:false,
-    audio:mediaOpts.audio?{echoCancellation:true,noiseSuppression:true,autoGainControl:true}:false
+    video:wantVideo?{width:{ideal:Math.round(h*16/9)},height:{ideal:h},facingMode:'user'}:false,
+    audio:wantAudio?{echoCancellation:true,noiseSuppression:true,autoGainControl:true}:false
   };
-  if(!c.video&&!c.audio)return true;
-  try{localStream=await navigator.mediaDevices.getUserMedia(c);document.getElementById('lv').srcObject=localStream;micOn=mediaOpts.audio;camOn=mediaOpts.video;return true;}
-  catch{return false;}
+  // Rien de coché = appel silencieux sans flux, on passe directement
+  if(!c.video&&!c.audio){micOn=false;camOn=false;return true;}
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia(c);
+    document.getElementById('lv').srcObject=localStream;
+    micOn=wantAudio;
+    camOn=wantVideo;
+    return true;
+  }catch(e){
+    console.error('getUserMedia error:',e.name,e.message);
+    return false;
+  }
 }
 
 // make short peer id — XXXX-XXXX-XXXX readable code
@@ -412,8 +425,16 @@ function startExpiry(){
 async function startCreate(){
   const btn=document.getElementById('genBtn');
   btn.disabled=true;btn.textContent='Initialisation…';
+  // Vérifier que l'API est disponible
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    btn.disabled=false;btn.textContent='Générer le code';
+    err('cerr','Votre navigateur ne supporte pas l\'accès aux médias. Utilisez Chrome ou Firefox sur HTTPS.');return;
+  }
   const ok=await getMedia();
-  if(!ok){btn.disabled=false;btn.textContent='Générer le code';err('cerr','Impossible d\'accéder aux médias. Vérifiez les permissions.');return;}
+  if(!ok){
+    btn.disabled=false;btn.textContent='Générer le code';
+    err('cerr','Permission refusée ou périphérique indisponible. Vérifiez que le site est en HTTPS et que la caméra/micro ne sont pas utilisés par une autre application.');return;
+  }
   myCode=makePeerId();
   peer=new Peer(rawId(myCode),{debug:0});
   peer.on('error',e=>{
@@ -449,8 +470,11 @@ async function handleJoin(){
   if(raw.length<12){err('jerr','Code invalide — il doit faire 12 caractères.');return;}
   const fmt=raw.slice(0,4)+'-'+raw.slice(4,8)+'-'+raw.slice(8,12);
   const tid=rawId(fmt);
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    err('jerr','Votre navigateur ne supporte pas l\'accès aux médias. Utilisez Chrome ou Firefox sur HTTPS.');return;
+  }
   const ok=await getMedia();
-  if(!ok){err('jerr','Impossible d\'accéder aux médias.');return;}
+  if(!ok){err('jerr','Permission refusée ou périphérique indisponible. Vérifiez que le site est en HTTPS et que la caméra/micro ne sont pas utilisés ailleurs.');return;}
   peer=new Peer({debug:0});
   peer.on('error',e=>{
     err('jerr',e.type==='peer-unavailable'?'Code introuvable ou expiré.':'Erreur: '+e.type);
@@ -502,18 +526,32 @@ function toggleMic(){micOn=!micOn;localStream?.getAudioTracks().forEach(t=>t.ena
 function toggleCam(){camOn=!camOn;localStream?.getVideoTracks().forEach(t=>t.enabled=camOn);document.getElementById('lv').style.opacity=camOn?'1':'0.3';setCtrl('camB','camSl',camOn);}
 async function toggleScreen(){
   if(!scrOn){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+      alert('Le partage d\'écran n\'est pas supporté par votre navigateur.');return;
+    }
     try{
-      screenStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false});
       const track=screenStream.getVideoTracks()[0];
-      if(call?.peerConnection){const s=call.peerConnection.getSenders().find(s=>s.track?.kind==='video');if(s)s.replaceTrack(track);}
-      document.getElementById('lv').srcObject=screenStream;document.getElementById('lv').style.display='block';
-      track.onended=()=>{scrOn=true;toggleScreen();};scrOn=true;
-    }catch{return;}
+      // Remplacer la piste vidéo dans la connexion PeerJS
+      const sender=call?.peerConnection?.getSenders().find(s=>s.track?.kind==='video');
+      if(sender){sender.replaceTrack(track);}
+      document.getElementById('lv').srcObject=screenStream;
+      document.getElementById('lv').style.display='block';
+      track.onended=()=>{if(scrOn)toggleScreen();};
+      scrOn=true;
+    }catch(e){
+      console.error('getDisplayMedia error:',e);
+      return;
+    }
   }else{
-    const ct=localStream?.getVideoTracks()[0];
-    if(call?.peerConnection&&ct){const s=call.peerConnection.getSenders().find(s=>s.track?.kind==='video');if(s)s.replaceTrack(ct);}
+    const camTrack=localStream?.getVideoTracks()[0];
+    const sender=call?.peerConnection?.getSenders().find(s=>s.track?.kind==='video');
+    if(sender&&camTrack){sender.replaceTrack(camTrack);}
+    else if(sender){sender.replaceTrack(null);}
     document.getElementById('lv').srcObject=localStream||null;
-    screenStream?.getTracks().forEach(t=>t.stop());screenStream=null;scrOn=false;
+    if(!localStream)document.getElementById('lv').style.display='none';
+    screenStream?.getTracks().forEach(t=>t.stop());
+    screenStream=null;scrOn=false;
   }
   setCtrl('scrB','scrSl',scrOn);
 }
@@ -636,7 +674,14 @@ wakeUp();
 window.addEventListener('resize',()=>{if(wide()&&document.getElementById('call').classList.contains('on')){chatOpen=true;document.getElementById('chtB').classList.add('chon');}});
 // check for QR/link code on load
 checkHashJoin();
-// v2.2.0
+// Warn if not HTTPS (except localhost)
+if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
+  const w=document.createElement('div');
+  w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#c03030;color:#fff;text-align:center;padding:10px 16px;font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;';
+  w.textContent='⚠ Ce site doit être ouvert en HTTPS pour accéder à la caméra et au micro.';
+  document.body.prepend(w);
+}
+// v2.3.0
 </script>
 </body>
 </html>
