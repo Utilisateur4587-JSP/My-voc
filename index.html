@@ -1,1290 +1,1189 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>my'voc</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>P2P Chat — Sans Serveur</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-:root {
-  --bg:#09090e;--surface:#111118;--surface2:#16161f;--surface3:#1e1e2a;
-  --border:#252535;--accent:#7c6dfa;--adim:rgba(124,109,250,0.15);
-  --a2:#fa6d9a;--a3:#6dfacd;--text:#eeeef5;--muted:#6060a0;
-  --danger:#f04545;--glow:0 0 60px rgba(124,109,250,0.12);--r:18px;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{height:100%;}
-body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100%;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 70% 50% at 15% 15%,rgba(124,109,250,.10) 0%,transparent 70%),
-             radial-gradient(ellipse 50% 60% at 85% 85%,rgba(250,109,154,.07) 0%,transparent 70%);}
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap');
 
-/* ── SETUP ── */
-#app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px 40px;}
-.logo{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(to bottom,rgba(9,9,14,.95),transparent);}
-.logo-text{font-size:1rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;background:linear-gradient(135deg,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.screen{display:none;width:100%;max-width:440px;}
-.screen.active{display:flex;flex-direction:column;align-items:center;gap:16px;animation:fu .35s ease;}
-@keyframes fu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7cffcb;
+    --accent2: #ff6b9d;
+    --warn: #ffd166;
+    --text: #e8e8f0;
+    --muted: #666680;
+    --radius: 16px;
+    --glow: 0 0 30px rgba(124,255,203,0.15);
+  }
 
-.htitle{font-size:clamp(2rem,8vw,2.8rem);font-weight:800;line-height:1.05;text-align:center;}
-.htitle em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.hsub{color:var(--muted);font-size:.88rem;margin-top:10px;line-height:1.65;font-weight:400;text-align:center;max-width:320px;}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;width:100%;box-shadow:var(--glow),0 4px 40px rgba(0,0,0,.45);}
-.ctitle{font-size:1.2rem;font-weight:800;margin-bottom:4px;}
-.csub{color:var(--muted);font-size:.82rem;font-weight:400;margin-bottom:20px;line-height:1.5;}
-.badge{display:inline-flex;align-items:center;background:var(--adim);border:1px solid rgba(124,109,250,.3);border-radius:20px;padding:3px 11px;font-size:.7rem;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;}
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    overflow-x: hidden;
+  }
 
-.btn{display:flex;align-items:center;justify-content:center;gap:9px;padding:15px 22px;border-radius:13px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;transition:all .18s ease;letter-spacing:.02em;width:100%;}
-.btn:hover{filter:brightness(1.1);}.btn:active{transform:scale(.97);}
-.btn-p{background:linear-gradient(135deg,var(--accent),#5a4de8);color:#fff;box-shadow:0 4px 20px rgba(124,109,250,.3);}
-.btn-s{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
-.btn-g{background:transparent;color:var(--muted);border:1px solid var(--border);}
-.btn-sm{padding:10px 16px;font-size:.82rem;border-radius:10px;}
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
 
-.lbl{font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.09em;text-transform:uppercase;margin-bottom:7px;display:block;}
-input,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:11px;color:var(--text);font-family:'DM Mono',monospace;font-size:.9rem;padding:13px 15px;outline:none;transition:border .2s,box-shadow .2s;-webkit-appearance:none;letter-spacing:.1em;}
-input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,109,250,.14);}
-input::placeholder{color:var(--muted);letter-spacing:.04em;}
-select option{background:var(--surface2);}
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
 
-/* code display */
-.code-display{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:22px 18px;text-align:center;width:100%;}
-.code-big{font-family:'DM Mono',monospace;font-size:clamp(1.5rem,6vw,2rem);font-weight:500;letter-spacing:.22em;color:var(--accent);line-height:1.3;}
-.code-acts{display:flex;gap:8px;margin-top:16px;}
-.code-acts .btn{flex:1;padding:11px 14px;font-size:.82rem;border-radius:10px;}
-.btn-cp{background:var(--surface3);color:var(--text);border:1px solid var(--border);}
-.btn-cp.ok{background:rgba(109,250,205,.12);border-color:var(--a3);color:var(--a3);}
-.btn-sh{background:var(--adim);border:1px solid rgba(124,109,250,.3);color:var(--accent);}
+  body::after {
+    content: '';
+    position: fixed;
+    width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,255,203,0.06) 0%, transparent 70%);
+    top: -200px; right: -200px;
+    animation: pulse 8s ease-in-out infinite;
+    pointer-events: none; z-index: 0;
+  }
 
-/* expiry */
-.exp-wrap{width:100%;margin-top:14px;}
-.exp-bg{width:100%;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
-.exp-bar{height:100%;border-radius:2px;background:var(--a3);transition:width 1s linear,background 1s;}
-.exp-txt{font-size:.7rem;color:var(--muted);margin-top:6px;font-family:'DM Mono',monospace;text-align:center;}
-.exp-txt.red{color:var(--danger);}
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.2);opacity:0.6} }
 
-.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;}
-.dot.pulse{background:#e0b040;animation:dp 1.3s infinite;}
-.dot.ok{background:var(--a3);}.dot.err{background:var(--danger);}
-@keyframes dp{0%,100%{opacity:1}50%{opacity:.2}}
-.srow{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);justify-content:center;}
-.blink{display:flex;gap:5px;justify-content:center;}
-.blink span{width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.2;animation:bl 1.4s infinite;}
-.blink span:nth-child(2){animation-delay:.18s}.blink span:nth-child(3){animation-delay:.36s}
-@keyframes bl{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  /* ── LAYOUT ── */
+  #app {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; flex: 1;
+    width: 100%; max-width: 760px;
+    margin: 0 auto; padding: 14px; gap: 14px;
+  }
 
-.ibox{background:var(--adim);border:1px solid rgba(124,109,250,.18);border-radius:11px;padding:11px 14px;font-size:.78rem;line-height:1.65;color:var(--muted);width:100%;}
-.ibox strong{color:var(--accent);}
-.ebox{background:rgba(240,69,69,.07);border:1px solid rgba(240,69,69,.25);border-radius:11px;padding:11px 14px;font-size:.8rem;color:var(--danger);width:100%;display:none;}
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
 
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
-.mopt{padding:14px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;text-align:center;transition:all .18s;user-select:none;}
-.mopt:hover{border-color:rgba(124,109,250,.4);}.mopt.on{border-color:var(--accent);background:var(--adim);}
-.mopt-ico{height:24px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;}
-.mopt-lbl{font-size:.75rem;font-weight:700;color:var(--muted);}.mopt.on .mopt-lbl{color:var(--accent);}
-.qrow{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
-.qrow .lbl{margin:0;white-space:nowrap;}.qrow select{flex:1;}
+  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(16px,4vw,22px); letter-spacing:-0.5px; }
+  .logo span { color: var(--accent); }
 
-/* geo icons */
-.geo{display:block;position:relative;flex-shrink:0;}
-.geo-mic{width:9px;height:12px;border:2px solid currentColor;border-radius:5px;}
-.geo-mic::before{content:'';position:absolute;width:15px;height:7px;border:2px solid currentColor;border-top:none;border-radius:0 0 9px 9px;top:9px;left:-5px;}
-.geo-mic::after{content:'';position:absolute;width:2px;height:4px;background:currentColor;bottom:-8px;left:1.5px;}
-.geo-cam{width:13px;height:9px;border:2px solid currentColor;border-radius:2px;}
-.geo-cam::after{content:'';position:absolute;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid currentColor;right:-7px;top:-1px;}
+  #status-badge {
+    display:flex; align-items:center; gap:7px;
+    font-size:10px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:1px;
+    padding:5px 11px; border:1px solid var(--border);
+    border-radius:100px; background:var(--surface); transition:all 0.4s;
+  }
+  #status-badge .dot { width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.4s; }
+  #status-badge.connected { color:var(--accent);border-color:var(--accent);box-shadow:var(--glow); }
+  #status-badge.connected .dot { background:var(--accent);animation:blink 1.5s ease-in-out infinite; }
+  #status-badge.connecting { color:var(--warn);border-color:rgba(255,209,102,0.3); }
+  #status-badge.connecting .dot { background:var(--warn); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-/* ── CALL ── */
-#call{display:none;position:fixed;inset:0;z-index:200;background:#050508;}
-#call.on{display:flex;}
-@media(min-width:700px){
-  #call.on{flex-direction:row;}
-  #vp{flex:1;position:relative;min-width:0;}
-  #cp{width:300px;flex-shrink:0;display:flex!important;flex-direction:column;background:var(--surface);border-left:1px solid var(--border);transform:none!important;}
-  #chatTogBtn{display:none!important;}
-}
-@media(max-width:699px){
-  #call.on{flex-direction:column;}
-  #vp{flex:1;position:relative;}
-  #cp{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;background:var(--bg);transform:translateY(100%);transition:transform .28s ease;}
-  #cp.open{transform:none;}
-}
-#rv{width:100%;height:100%;object-fit:cover;background:#0a0a14;display:block;}
-#lv{position:absolute;bottom:88px;right:14px;width:clamp(80px,18vw,130px);aspect-ratio:3/4;object-fit:cover;border-radius:11px;border:2px solid rgba(255,255,255,.12);box-shadow:0 6px 24px rgba(0,0,0,.5);background:#111;z-index:10;cursor:pointer;}
-.novid{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#0a0a14;}
-.novid.on{display:flex;}
-.avr{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--a2));display:flex;align-items:center;justify-content:center;}
-.avi{width:56px;height:56px;border-radius:50%;background:var(--surface);}
-.novid-lbl{font-size:.78rem;color:var(--muted);}
-.ctop{position:absolute;top:0;left:0;right:0;z-index:10;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(5,5,8,.85),transparent);pointer-events:none;}
-.ctop-name{font-size:.82rem;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);}
-.tpill{font-family:'DM Mono',monospace;font-size:.8rem;background:rgba(0,0,0,.45);border-radius:20px;padding:5px 12px;color:rgba(255,255,255,.65);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);}
-.cbar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:12px 16px max(24px,env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(5,5,8,.96) 60%,transparent);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
-.cb{width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .18s;background:rgba(255,255,255,.07);color:rgba(255,255,255,.8);font-family:'Syne',sans-serif;font-size:.58rem;font-weight:700;flex-shrink:0;}
-.cb:hover{background:rgba(255,255,255,.14);}.cb:active{transform:scale(.92);}
-.cb.off{background:rgba(240,69,69,.18);border-color:rgba(240,69,69,.3);color:var(--danger);}
-.cb.end{width:54px;height:54px;background:var(--danger);border-color:transparent;color:#fff;box-shadow:0 4px 18px rgba(240,69,69,.4);}
-.cb.end:hover{background:#d03030;}.cb.chon{background:var(--adim);border-color:rgba(124,109,250,.4);color:var(--accent);}
-.cbl{font-size:.56rem;letter-spacing:.03em;line-height:1;}
-.g{display:block;position:relative;}
-.gmic{width:9px;height:12px;border:2px solid currentColor;border-radius:5px;}
-.gmic::before{content:'';position:absolute;width:15px;height:7px;border:2px solid currentColor;border-top:none;border-radius:0 0 9px 9px;top:9px;left:-5px;}
-.gmic::after{content:'';position:absolute;width:2px;height:4px;background:currentColor;bottom:-8px;left:1.5px;}
-.gcam{width:13px;height:9px;border:2px solid currentColor;border-radius:2px;}
-.gcam::after{content:'';position:absolute;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid currentColor;right:-7px;top:-1px;}
-.gscr{width:14px;height:10px;border:2px solid currentColor;border-radius:2px;}
-.gscr::before{content:'';position:absolute;width:5px;height:3px;border-bottom:2px solid currentColor;border-left:2px solid currentColor;transform:rotate(-45deg);bottom:-5px;left:2.5px;}
-.gscr::after{content:'';position:absolute;width:8px;height:2px;background:currentColor;border-radius:1px;bottom:-8px;left:1px;}
-.gspk{width:7px;height:9px;background:currentColor;clip-path:polygon(0 28%,55% 0,55% 100%,0 72%);}
-.gspk::after{content:'';position:absolute;width:7px;height:7px;border:2px solid currentColor;border-left:none;border-radius:0 5px 5px 0;top:1px;right:-8px;}
-.gcht{width:13px;height:11px;border:2px solid currentColor;border-radius:3px;}
-.gcht::after{content:'';position:absolute;border-top:4px solid transparent;border-right:4px solid transparent;border-left:4px solid currentColor;bottom:-4px;left:2px;}
-.gx{width:14px;height:14px;}
-.gx::before,.gx::after{content:'';position:absolute;width:16px;height:2.5px;background:currentColor;border-radius:2px;top:5.5px;left:-1px;}
-.gx::before{transform:rotate(45deg);}.gx::after{transform:rotate(-45deg);}
-.gsl{position:absolute;width:24px;height:2px;background:var(--danger);border-radius:2px;transform:rotate(-40deg);top:50%;left:50%;margin:-1px 0 0 -12px;pointer-events:none;}
-.unr{position:absolute;top:-3px;right:-3px;width:15px;height:15px;border-radius:50%;background:var(--a2);color:#fff;font-size:.58rem;font-weight:800;line-height:15px;text-align:center;display:none;}
-.unr.on{display:block;}
+  /* ── SCREENS ── */
+  .screen { display:none; flex-direction:column; gap:14px; animation:fadeUp 0.35s ease; }
+  .screen.active { display:flex; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
-/* chat pane */
-.chdr{padding:13px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.chdr-t{font-size:.85rem;font-weight:800;}
-.cclose{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:4px;line-height:1;display:none;}
-@media(max-width:699px){.cclose{display:block;}}
-#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth;}
-#msgs::-webkit-scrollbar{width:3px;}
-#msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-.msg{max-width:84%;padding:9px 12px;border-radius:12px;font-size:.82rem;line-height:1.5;word-break:break-word;}
-.msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--accent),#5a4de8);color:#fff;border-bottom-right-radius:4px;}
-.msg.th{align-self:flex-start;background:var(--surface3);color:var(--text);border-bottom-left-radius:4px;}
-.mtime{font-size:.64rem;opacity:.5;margin-top:3px;font-family:'DM Mono',monospace;}
-.msg.me .mtime{text-align:right;}
-.cempty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.78rem;}
-.cfoot{padding:9px 11px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;padding-bottom:max(9px,env(safe-area-inset-bottom));flex-shrink:0;}
-#ci{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:18px;color:var(--text);font-family:'Syne',sans-serif;font-size:.85rem;padding:9px 14px;outline:none;resize:none;max-height:90px;line-height:1.4;transition:border .2s;}
-#ci:focus{border-color:var(--accent);}
-.sbtn{width:36px;height:36px;border-radius:50%;border:none;background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s;}
-.sbtn:hover{filter:brightness(1.15);}
-.sarr{width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:7px solid #fff;margin-left:2px;}
-/* qr code */
-.qr-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:18px;padding-top:18px;border-top:1px solid var(--border);}
-.qr-lbl{font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
-.qr-box{background:#fff;border-radius:12px;padding:12px;display:inline-flex;box-shadow:0 4px 20px rgba(0,0,0,.4);}
-.qr-box canvas,.qr-box img{display:block;border-radius:4px;}
-.qr-hint{font-size:.72rem;color:var(--muted);text-align:center;line-height:1.5;max-width:220px;}
-/* auto-join banner */
-.autojoin-banner{background:rgba(109,250,205,.08);border:1px solid rgba(109,250,205,.25);border-radius:11px;padding:13px 16px;font-size:.82rem;color:var(--a3);width:100%;text-align:center;line-height:1.5;}
-#wv{position:fixed;width:1px;height:1px;opacity:.01;pointer-events:none;z-index:-1;top:0;left:0;}
+  /* ── CARDS ── */
+  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px; }
+  .card-title { font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:14px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:12px 20px;border-radius:12px;border:none;cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;
+    transition:all 0.2s;text-decoration:none;width:100%;
+    -webkit-tap-highlight-color:transparent; user-select:none;
+  }
+  .btn-primary { background:var(--accent);color:#000;box-shadow:0 4px 18px rgba(124,255,203,0.3); }
+  .btn-primary:hover { transform:translateY(-2px);box-shadow:0 8px 28px rgba(124,255,203,0.45); }
+  .btn-primary:active { transform:translateY(0); }
+  .btn-secondary { background:transparent;color:var(--text);border:1px solid var(--border); }
+  .btn-secondary:hover { border-color:var(--accent);color:var(--accent); }
+  .btn-secondary.active-btn { border-color:var(--accent);color:var(--accent);background:rgba(124,255,203,0.08); }
+  .btn-danger { background:rgba(255,107,157,0.15);color:var(--accent2);border:1px solid rgba(255,107,157,0.3); }
+  .btn-danger:hover { background:rgba(255,107,157,0.25); }
+  .btn-ghost { background:transparent;color:var(--muted);border:1px solid transparent;width:auto;padding:7px 11px;font-size:11px; }
+  .btn-ghost:hover { color:var(--text); }
+  .btn-sm { padding:7px 12px;font-size:11px;border-radius:8px;width:auto; }
+  .btn-icon {
+    width:44px;height:44px;border-radius:50%;padding:0;flex-shrink:0;
+    background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s; -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  .btn-icon:hover { border-color:var(--accent);color:var(--accent); }
+  .btn-icon.active { background:var(--accent);border-color:var(--accent);color:#000;box-shadow:0 0 16px rgba(124,255,203,0.4); }
+  .btn-icon.danger { background:rgba(255,107,157,0.15);border-color:rgba(255,107,157,0.4);color:var(--accent2); }
+  .btn-icon.danger:hover { background:rgba(255,107,157,0.3); }
+
+  /* ── HOME ── */
+  .home-hero { text-align:center;padding:20px 14px; }
+  .home-hero h1 { font-family:'Syne',sans-serif;font-size:clamp(26px,8vw,50px);font-weight:800;line-height:1.1;margin-bottom:10px; }
+  .home-hero h1 .highlight { color:var(--accent); }
+  .home-hero p { color:var(--muted);font-size:12px;line-height:1.7;max-width:380px;margin:0 auto 24px; }
+  .btn-group { display:flex;flex-direction:column;gap:9px;max-width:300px;margin:0 auto; }
+  .divider { display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px; }
+  .divider::before,.divider::after { content:'';flex:1;height:1px;background:var(--border); }
+
+  /* ── QR + LINK ── */
+  .qr-wrapper { display:flex;justify-content:center;padding:14px;background:white;border-radius:12px;margin:4px 0; }
+  #qr-code canvas,#qr-code img,#qr-code-answer canvas,#qr-code-answer img { display:block; }
+  .link-box { display:flex;gap:7px;align-items:stretch; }
+  .link-text {
+    flex:1;background:var(--surface2);border:1px solid var(--border);
+    border-radius:10px;padding:9px 11px;
+    font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);
+    word-break:break-all;line-height:1.5;min-height:40px;max-height:72px;overflow-y:auto;
+  }
+
+  /* ── TEXTAREA ── */
+  textarea {
+    width:100%;background:var(--surface2);border:1px solid var(--border);
+    border-radius:10px;color:var(--text);font-family:'JetBrains Mono',monospace;
+    font-size:12px;padding:11px;resize:vertical;min-height:72px;
+    transition:border-color 0.3s;outline:none;
+  }
+  textarea:focus { border-color:var(--accent); }
+
+  /* ── VIDEO AREA ── */
+  #video-area {
+    display:none;
+    flex-direction:column;
+    gap:10px;
+  }
+  #video-area.visible { display:flex; }
+
+  .video-grid {
+    display:grid;
+    gap:8px;
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .video-grid.one { grid-template-columns:1fr; }
+  .video-grid.two { grid-template-columns:1fr 1fr; }
+
+  .video-slot {
+    position:relative;
+    aspect-ratio:16/9;
+    background:#000;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid var(--border);
+  }
+
+  .video-slot video {
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .video-label {
+    position:absolute;bottom:8px;left:10px;
+    font-size:10px;color:rgba(255,255,255,0.7);
+    background:rgba(0,0,0,0.5);
+    padding:3px 8px;border-radius:100px;
+    backdrop-filter:blur(4px);
+  }
+
+  .video-placeholder {
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;color:var(--muted);font-size:11px;
+  }
+  .video-placeholder .avatar {
+    width:52px;height:52px;border-radius:50%;
+    background:var(--surface2);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:24px;
+  }
+
+  /* pip self-view overlay */
+  #self-pip {
+    position:absolute;
+    bottom:8px;right:8px;
+    width:28%;max-width:120px;
+    aspect-ratio:16/9;
+    border-radius:8px;
+    overflow:hidden;
+    border:2px solid var(--accent);
+    z-index:10;
+    background:#000;
+    box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  }
+  #self-pip video { width:100%;height:100%;object-fit:cover;display:block; }
+
+  /* ── MEDIA CONTROLS BAR ── */
+  #media-controls {
+    display:none;
+    align-items:center;justify-content:center;
+    gap:10px;
+    padding:12px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    flex-wrap:wrap;
+  }
+  #media-controls.visible { display:flex; }
+
+  .ctrl-group { display:flex;align-items:center;gap:8px; }
+  .ctrl-label { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap; }
+
+  /* Noise filter toggle pill */
+  .noise-toggle {
+    display:flex;align-items:center;gap:6px;
+    padding:6px 12px;
+    border-radius:100px;
+    border:1px solid var(--border);
+    background:var(--surface2);
+    cursor:pointer;
+    font-size:11px;color:var(--muted);
+    transition:all 0.2s;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .noise-toggle.on { border-color:var(--accent);color:var(--accent);background:rgba(124,255,203,0.08); }
+  .noise-toggle .pill-dot { width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background 0.2s; }
+  .noise-toggle.on .pill-dot { background:var(--accent); }
+
+  /* ── CHAT SCREEN ── */
+  #chat-screen.active { display:flex;flex-direction:column; }
+
+  .chat-wrapper { display:flex;flex-direction:column;flex:1;gap:10px;min-height:0; }
+
+  #messages {
+    flex:1;overflow-y:auto;padding:10px;
+    display:flex;flex-direction:column;gap:8px;
+    min-height:120px;max-height:35dvh;
+    scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+  }
+
+  .msg {
+    max-width:76%;padding:9px 13px;border-radius:14px;
+    font-size:13px;line-height:1.5;animation:msgIn 0.22s ease;word-break:break-word;
+  }
+  @keyframes msgIn { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }
+  .msg.me { align-self:flex-end;background:var(--accent);color:#000;border-bottom-right-radius:4px; }
+  .msg.them { align-self:flex-start;background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px; }
+  .msg-time { font-size:9px;opacity:0.5;margin-top:3px; }
+  .msg.me .msg-time { text-align:right; }
+  .system-msg { text-align:center;font-size:11px;color:var(--muted);padding:4px; }
+
+  .chat-input-area { display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--border);align-items:flex-end; }
+  #msg-input { flex:1;min-height:42px;max-height:110px;padding:11px;font-size:13px;resize:none;border-radius:12px;min-height:42px; }
+  #send-btn {
+    width:42px;height:42px;border-radius:12px;padding:0;flex-shrink:0;
+    background:var(--accent);border:none;cursor:pointer;color:#000;
+    display:flex;align-items:center;justify-content:center;font-size:17px;
+    transition:all 0.2s;-webkit-tap-highlight-color:transparent;
+  }
+  #send-btn:hover { transform:scale(1.06); }
+  #send-btn:active { transform:scale(0.95); }
+
+  /* ── INFO / STEP ── */
+  .info-box { background:rgba(124,255,203,0.06);border:1px solid rgba(124,255,203,0.2);border-radius:10px;padding:11px;font-size:12px;color:var(--accent);line-height:1.6; }
+  .step-row { display:flex;align-items:flex-start;gap:11px;padding:9px 0;border-bottom:1px solid var(--border); }
+  .step-row:last-child { border-bottom:none; }
+  .step-num { width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--accent);flex-shrink:0; }
+  .step-text { font-size:12px;color:var(--muted);line-height:1.6; }
+  .step-text strong { color:var(--text); }
+
+  /* ── MISC ── */
+  .hidden { display:none !important; }
+  .spinner { width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  #copy-toast {
+    position:fixed;bottom:22px;left:50%;
+    transform:translateX(-50%) translateY(100px);
+    background:var(--accent);color:#000;font-size:12px;font-weight:600;
+    padding:9px 18px;border-radius:100px;z-index:999;
+    transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events:none;white-space:nowrap;
+  }
+  #copy-toast.show { transform:translateX(-50%) translateY(0); }
+
+  /* Wake-lock invisible video */
+  #wake-video {
+    position:fixed;
+    width:2px;height:2px;
+    bottom:0;right:0;
+    opacity:0.01;
+    pointer-events:none;
+    z-index:-1;
+  }
+
+  @media(min-width:600px) {
+    #app { padding:20px; }
+    .btn-group { flex-direction:row;max-width:none; }
+    .btn-group .btn { flex:1; }
+    #messages { max-height:40dvh; }
+  }
 </style>
 </head>
 <body>
-<video id="wv" autoplay loop muted playsinline aria-hidden="true"></video>
 
-<!-- SETUP -->
+<!-- ══ WAKE LOCK VIDEO (invisible, 1px, loop) ══ -->
+<video id="wake-video" autoplay muted loop playsinline
+  src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA2htZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1NSByMjkxNyAwYTg0ZDk4IC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxOCAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiBicmFtZXM9MyBvcGVuX2dvcD0wIHdlaWdodHA9MiByZWZpbmU9MCBhcT0xOjEuMDAgYml0cmF0ZT0zOCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgdmJzX21heHJhdGU9MCBsb29rYWhlYWQ9NDggcmNfbG9va2FoZWFkPTQwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByYz1hYnIgbWJ0cmVlPTEgYml0cmF0ZT0zOCByYXRldG9sPTEuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgdmJzX21heHJhdGU9MCBmaWxsZXI9MAAAAAplbWRhAAAAAAAEMAAAABRidHJ0AAAAAAAAAARAAAAAAB5bWluZQAAAAAAAAOqAAAACGhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAAA9W1pbmYAAAAUdm1oZAAAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAALVzdGJsAAAAlXN0c2QAAAAAAAAAAQAAAIW+YXZjMQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAQAAgBIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPkAAAAAAAAAAAAAAAAAAAC5YXZjQwFkAAr/4QAYZ2QACqzZQkHgCAAAAwCAAAAMBA8WLZYAAAAAGHNidHMAAAAAAAAAAAAAAAAUc3RzYwAAAAAAAAABAAAAAgAAAAIAAAABAAAAGHN0c3oAAAAAAAAAAAAAAAAAAAACAAAAFHN0Y28AAAAAAAAAAQAAADQ=">
+</video>
+
 <div id="app">
-  <div class="logo"><span class="logo-text">my'voc</span></div>
-
-  <!-- HOME -->
-  <div id="homeScreen" class="screen active">
-    <h1 class="htitle">Appels <em>privés</em><br/>sans serveur</h1>
-    <p class="hsub">Connexion directe, chiffrement WebRTC de bout en bout. Un seul code à partager.</p>
-    <div style="display:flex;flex-direction:column;gap:11px;width:100%;margin-top:8px;">
-      <button class="btn btn-p" onclick="goTo('createScreen')">Créer un appel</button>
-      <button class="btn btn-s" onclick="goTo('joinScreen')">Rejoindre un appel</button>
+  <header>
+    <div class="logo">P2P<span>Chat</span></div>
+    <div id="status-badge">
+      <div class="dot"></div>
+      <span id="status-text">Hors ligne</span>
     </div>
-    <div class="ibox"><strong>Chiffré de bout en bout</strong> — Le code expire en 5 min. Le relais de signaling ne voit jamais vos flux audio/vidéo.</div>
+  </header>
+
+  <!-- ══ HOME ══ -->
+  <div id="home-screen" class="screen active">
+    <div class="home-hero">
+      <h1>Chat<br><span class="highlight">Direct</span></h1>
+      <p>Communication chiffrée entre 2 appareils,<br>sans aucun serveur intermédiaire.</p>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="createCall()">📡 Créer un appel</button>
+        <div class="divider">ou</div>
+        <button class="btn btn-secondary" onclick="showJoin()">🔗 Rejoindre</button>
+      </div>
+    </div>
+    <div id="join-panel" class="card hidden">
+      <div class="card-title">Rejoindre via lien</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Colle le lien reçu ici :</p>
+      <textarea id="join-link-input" placeholder="Colle le lien P2P ici..."></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="joinFromLink()">Rejoindre</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('join-panel').classList.add('hidden')">Annuler</button>
+      </div>
+    </div>
   </div>
 
-  <!-- CREATE -->
-  <div id="createScreen" class="screen">
-    <div class="card" id="c1">
-      <div class="badge">Nouveau</div>
-      <div class="ctitle">Créer un appel</div>
-      <div class="csub">Configurez puis envoyez le code — votre contact n'a qu'à le coller pour rejoindre.</div>
-      <div class="lbl">Activer à l'ouverture</div>
-      <div class="mgrid">
-        <div class="mopt" id="opt-video" onclick="toggleOpt('video')">
-          <div class="mopt-ico"><span class="geo geo-cam"></span></div>
-          <div class="mopt-lbl">Caméra</div>
-        </div>
-        <div class="mopt" id="opt-audio" onclick="toggleOpt('audio')">
-          <div class="mopt-ico"><span class="geo geo-mic"></span></div>
-          <div class="mopt-lbl">Micro</div>
+  <!-- ══ CREATE ══ -->
+  <div id="create-screen" class="screen">
+    <div class="card">
+      <div class="card-title">Étape 1 — Partage ce lien</div>
+      <div class="qr-wrapper"><div id="qr-code"></div></div>
+      <div style="margin:10px 0;">
+        <div class="link-box">
+          <div id="offer-link" class="link-text">Génération…</div>
+          <button class="btn btn-primary btn-sm" onclick="copyLink('offer-link')">Copier</button>
         </div>
       </div>
-      <div class="qrow">
-        <span class="lbl">Qualité</span>
-        <select id="qsel">
-          <option value="360">360p — léger</option>
-          <option value="480">480p</option>
-          <option value="720" selected>720p — HD</option>
-          <option value="1080">1080p — Full HD</option>
-        </select>
-      </div>
-      <button class="btn btn-p" id="genBtn" onclick="startCreate()">Générer le code</button>
-      <div class="ebox" id="cerr" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="card" id="c2" style="display:none;">
-      <div class="badge">Code d'invitation</div>
-      <div class="ctitle">Envoyez ce code</div>
-      <div class="csub">Votre contact le colle dans "Rejoindre" — l'appel démarre automatiquement.</div>
-      <div class="code-display">
-        <div class="code-big" id="codeBig">—</div>
-        <div class="code-acts">
-          <button class="btn btn-cp" id="cpBtn" onclick="copyCode()">Copier le lien</button>
-          <button class="btn btn-sh" id="shBtn" onclick="shareCode()" style="display:none;">Partager</button>
-        </div>
-      </div>
-      <div class="exp-wrap">
-        <div class="exp-bg"><div class="exp-bar" id="expBar"></div></div>
-        <div class="exp-txt" id="expTxt">Expire dans 5:00</div>
-      </div>
-      <!-- QR code -->
-      <div class="qr-wrap" id="qrWrap" style="display:none;">
-        <div class="qr-lbl">Scanner pour rejoindre</div>
-        <div class="qr-box"><div id="qrCanvas"></div></div>
-        <div class="qr-hint">L'autre personne scanne ce QR avec son téléphone — la page s'ouvre avec le code déjà rempli.</div>
-      </div>
-      <div class="blink" style="margin-top:14px;"><span></span><span></span><span></span></div>
-      <div class="srow" style="margin-top:8px;">
-        <div class="dot pulse" id="cDot"></div><span id="cStat">En attente que votre contact rejoigne…</span>
-      </div>
-    </div>
-
-    <button class="btn btn-g btn-sm" style="width:auto;" onclick="goTo('homeScreen');resetAll()">← Retour</button>
-  </div>
-
-  <!-- JOIN -->
-  <div id="joinScreen" class="screen">
-    <div class="autojoin-banner" id="autojoinBanner" style="display:none;">
-      Code détecté depuis le lien — cliquez sur Rejoindre pour lancer l'appel.
+      <div class="info-box">📲 Envoie ce lien à ton ami. Quand il l'ouvre, il verra un lien à te renvoyer.</div>
     </div>
     <div class="card">
-      <div class="badge">Rejoindre</div>
-      <div class="ctitle">Rejoindre un appel</div>
-      <div class="csub">Entrez le code envoyé par votre contact.</div>
-      <div class="lbl">Code d'invitation</div>
-      <input id="jinp" type="text" maxlength="14" placeholder="XXXX-XXXX-XXXX"
-        oninput="fmtCode(this)"
-        onkeydown="if(event.key==='Enter')handleJoin()"/>
-      <div style="margin-top:14px;"><button class="btn btn-p" onclick="handleJoin()">Rejoindre</button></div>
-      <div class="ebox" id="jerr" style="margin-top:12px;"></div>
+      <div class="card-title">Étape 2 — Colle la réponse de ton ami</div>
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div class="step-text">Ton ami ouvre le lien et te renvoie <strong>son lien de réponse</strong></div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div class="step-text">Colle ce lien ici :</div>
+      </div>
+      <textarea id="answer-input" placeholder="Colle le lien de réponse de ton ami ici..."></textarea>
+      <div style="margin-top:10px;">
+        <button class="btn btn-primary" id="connect-btn" onclick="connectAnswer()">
+          <span class="spinner hidden" id="connect-spinner"></span>
+          Connecter
+        </button>
+      </div>
     </div>
-    <button class="btn btn-g btn-sm" style="width:auto;" onclick="goTo('homeScreen');resetAll()">← Retour</button>
+    <button class="btn btn-ghost" onclick="goHome()">← Retour</button>
+  </div>
+
+  <!-- ══ JOIN ══ -->
+  <div id="join-screen" class="screen">
+    <div class="card">
+      <div class="card-title">Connexion en cours…</div>
+      <div class="info-box" style="margin-bottom:10px;">✅ Lien détecté ! Génération de ta réponse…</div>
+      <div id="join-qr-wrapper" class="hidden">
+        <div class="card-title" style="margin-top:6px;">Renvoie CE lien à ton ami</div>
+        <div class="qr-wrapper"><div id="qr-code-answer"></div></div>
+        <div class="link-box">
+          <div id="answer-link" class="link-text">Génération…</div>
+          <button class="btn btn-primary btn-sm" onclick="copyLink('answer-link')">Copier</button>
+        </div>
+        <div class="info-box" style="margin-top:10px;">⏳ En attente que ton ami colle ta réponse…</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" onclick="goHome()">← Retour</button>
+  </div>
+
+  <!-- ══ CHAT ══ -->
+  <div id="chat-screen" class="screen">
+
+    <!-- VIDEO AREA -->
+    <div id="video-area">
+      <div class="video-grid one" id="video-grid">
+        <!-- remote -->
+        <div class="video-slot" id="remote-slot">
+          <video id="remote-video" autoplay playsinline></video>
+          <div class="video-placeholder" id="remote-placeholder">
+            <div class="avatar">👤</div>
+            <span>En attente vidéo…</span>
+          </div>
+          <div class="video-label">Ami</div>
+          <!-- self pip inside remote when both active -->
+          <div id="self-pip" class="hidden">
+            <video id="self-pip-video" autoplay muted playsinline></video>
+          </div>
+        </div>
+        <!-- local full (when no remote) -->
+        <div class="video-slot hidden" id="local-slot">
+          <video id="local-video" autoplay muted playsinline></video>
+          <div class="video-label">Moi</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEDIA CONTROLS -->
+    <div id="media-controls">
+      <!-- Micro -->
+      <div class="ctrl-group">
+        <button class="btn-icon" id="mic-btn" title="Micro" onclick="toggleMic()">🎙️</button>
+        <div class="noise-toggle" id="noise-btn" onclick="toggleNoise()" title="Filtre bruit">
+          <div class="pill-dot"></div>
+          <span>Filtre</span>
+        </div>
+      </div>
+
+      <!-- Cam -->
+      <div class="ctrl-group">
+        <button class="btn-icon" id="cam-btn" title="Caméra" onclick="toggleCam()">📷</button>
+      </div>
+
+      <!-- Screen share -->
+      <div class="ctrl-group">
+        <button class="btn-icon" id="screen-btn" title="Partage d'écran" onclick="toggleScreen()">🖥️</button>
+      </div>
+
+      <!-- End call / Hang up media -->
+      <div class="ctrl-group">
+        <button class="btn-icon danger" title="Couper tout" onclick="stopAllMedia()">✕</button>
+      </div>
+    </div>
+
+    <!-- CHAT CARD -->
+    <div class="card chat-wrapper">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>💬 Discussion</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" id="media-toggle-btn" onclick="toggleMediaPanel()">📹 Médias</button>
+          <button class="btn btn-ghost btn-sm" onclick="goHome()">Quitter</button>
+        </div>
+      </div>
+      <div id="messages">
+        <div class="system-msg">🔒 Connexion chiffrée établie</div>
+      </div>
+      <div class="chat-input-area">
+        <textarea id="msg-input" placeholder="Message…" rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+          oninput="autoResize(this)"></textarea>
+        <button id="send-btn" onclick="sendMsg()">↑</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- CALL -->
-<div id="call">
-  <div id="vp">
-    <div class="novid" id="novid">
-      <div class="avr"><div class="avi"></div></div>
-      <div class="novid-lbl">Appel audio</div>
-    </div>
-    <video id="rv" autoplay playsinline></video>
-    <video id="lv" autoplay playsinline muted></video>
-    <div class="ctop">
-      <div class="ctop-name">my'voc</div>
-      <div class="tpill" id="timer">00:00</div>
-    </div>
-    <div class="cbar">
-      <button class="cb" id="micB" onclick="toggleMic()">
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <span class="g gmic"></span><span class="gsl" id="micSl" style="display:none;"></span></div>
-        <span class="cbl">Micro</span>
-      </button>
-      <button class="cb" id="camB" onclick="toggleCam()">
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <span class="g gcam"></span><span class="gsl" id="camSl" style="display:none;"></span></div>
-        <span class="cbl">Caméra</span>
-      </button>
-      <button class="cb" id="scrB" onclick="toggleScreen()">
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <span class="g gscr"></span><span class="gsl" id="scrSl" style="display:none;"></span></div>
-        <span class="cbl">Écran</span>
-      </button>
-      <button class="cb end" onclick="hangUp()"><span class="g gx"></span></button>
-      <button class="cb" id="spkB" onclick="toggleSpk()">
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <span class="g gspk"></span><span class="gsl" id="spkSl" style="display:none;"></span></div>
-        <span class="cbl">Son</span>
-      </button>
-      <button class="cb" id="chtB" onclick="toggleChat()" style="position:relative;">
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <span class="g gcht"></span></div>
-        <span class="cbl">Chat</span>
-        <span class="unr" id="unr"></span>
-      </button>
-    </div>
-  </div>
-  <div id="cp">
-    <div class="chdr">
-      <span class="chdr-t">Messages</span>
-      <button class="cclose" onclick="toggleChat()">✕</button>
-    </div>
-    <div id="msgs"><div class="cempty" id="cempty">Aucun message</div></div>
-    <div class="cfoot">
-      <textarea id="ci" rows="1" placeholder="Message…"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"
-        oninput="autoR(this)"></textarea>
-      <button class="sbtn" onclick="sendMsg()"><span class="sarr"></span></button>
-    </div>
-  </div>
-</div>
+<div id="copy-toast">✓ Copié !</div>
 
 <script>
-// ════════════════════════════════════════════════════════════════
-//  my'voc — v2.5.0
-//  Application d'appel vidéo/audio P2P chiffrée de bout en bout
-//  via WebRTC (PeerJS). Pas de serveur central pour les flux média.
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let pc = null;
+let dc = null;
+let myRole = null;
+let qrGenerated = {};
 
-// ── CONSTANTES ──────────────────────────────────────────────────
-// Durée de validité du code d'invitation (en millisecondes)
-const EXPIRY = 5 * 60 * 1000; // 5 minutes
+// Media state
+let localStream = null;       // cam/mic stream
+let screenStream = null;      // screen share stream
+let audioCtx = null;
+let noiseNode = null;
+let micSource = null;
+let micDestination = null;
+let noiseActive = false;
+let micMuted = false;
+let camOn = false;
+let screenOn = false;
 
-// ── ÉTAT GLOBAL ─────────────────────────────────────────────────
-let peer = null;          // Instance PeerJS (notre connexion au réseau de signaling)
-let conn = null;          // Canal de données PeerJS (pour le chat)
-let call = null;          // Objet d'appel PeerJS (pour l'audio/vidéo)
-let localStream = null;   // Flux média local (caméra + micro de l'utilisateur)
-let screenStream = null;  // Flux de partage d'écran (si actif)
-let myCode = '';          // Code d'invitation généré (format XXXX-XXXX-XXXX)
+// Media panel visibility
+let mediaPanelOpen = false;
 
-// État des contrôles pendant l'appel
-let micOn = false;   // Micro activé ?
-let camOn = false;   // Caméra activée ?
-let scrOn = false;   // Partage d'écran actif ?
-let spkOn = true;    // Son du correspondant activé ?
+const HASH_PREFIX_OFFER  = '#offer=';
+const HASH_PREFIX_ANSWER = '#answer=';
 
-// Options média choisies par l'utilisateur AVANT de démarrer l'appel
-let mediaOpts = { video: false, audio: false };
+// ══════════════════════════════════════════════════
+//  WAKE LOCK — tiny video loop + Screen Wake Lock API
+// ══════════════════════════════════════════════════
+let wakeLock = null;
 
-// Compteurs et timers
-let callSecs = 0;    // Durée de l'appel en secondes
-let callInt = null;  // setInterval pour le chrono de l'appel
-let expEnd = 0;      // Timestamp d'expiration du code
-let expInt = null;   // setInterval pour la barre d'expiration
+async function requestWakeLock() {
+  // Method 1: Screen Wake Lock API (Chrome/Edge)
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+      return;
+    }
+  } catch(e) {}
+  // Method 2: tiny invisible looping video (Android fallback)
+  const v = document.getElementById('wake-video');
+  v.play().catch(()=>{});
+}
 
-// Chat
-let unread = 0;       // Nombre de messages non lus
-let chatOpen = false; // Panneau chat visible ?
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  // video stays playing — harmless
+}
 
-// Utilitaire : retourne true si l'écran est en mode large (≥ 700px)
-const wide = () => window.innerWidth >= 700;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && !wakeLock) {
+    try {
+      if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    } catch(e) {}
+  }
+});
 
-
-// ── NAVIGATION ──────────────────────────────────────────────────
-/**
- * Affiche l'écran demandé et masque tous les autres.
- * @param {string} id - L'id de l'élément .screen à afficher
- */
-function goTo(id) {
+// ══════════════════════════════════════════════════
+//  SCREEN MANAGEMENT
+// ══════════════════════════════════════════════════
+function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
-
-// ── OPTIONS MÉDIA (avant appel) ─────────────────────────────────
-/**
- * Active/désactive une option média (caméra ou micro) dans l'écran de création.
- * Met à jour l'objet mediaOpts et le style visuel du bouton.
- * @param {string} t - 'video' ou 'audio'
- */
-function toggleOpt(t) {
-  mediaOpts[t] = !mediaOpts[t];
-  document.getElementById('opt-' + t).classList.toggle('on', mediaOpts[t]);
+function goHome() {
+  stopAllMedia();
+  if (pc) { pc.close(); pc = null; dc = null; }
+  releaseWakeLock();
+  setStatus('offline');
+  showScreen('home-screen');
 }
 
-
-// ── FORMATAGE DU CODE ───────────────────────────────────────────
-/**
- * Formate la saisie du code d'invitation en temps réel : XXXX-XXXX-XXXX.
- * Supprime les caractères non valides et ajoute automatiquement les tirets.
- * @param {HTMLInputElement} el - Le champ de saisie
- */
-function fmtCode(el) {
-  // Garde uniquement les lettres et chiffres, max 12 caractères
-  let v = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-  let out = '';
-  for (let i = 0; i < v.length; i++) {
-    if (i > 0 && i % 4 === 0) out += '-'; // Ajoute un tiret toutes les 4 lettres
-    out += v[i];
-  }
-  el.value = out;
+function showJoin() {
+  document.getElementById('join-panel').classList.remove('hidden');
 }
 
-
-// ── CONTEXTE AUDIO (Web Audio API) ─────────────────────────────
-// Référence globale au contexte audio et au flux filtré.
-// Le contexte est créé une seule fois et réutilisé pendant toute la session.
-let audioCtx = null;       // AudioContext (moteur de traitement audio)
-let filteredStream = null; // MediaStream contenant la piste audio filtrée
-
-/**
- * Applique une chaîne de traitement audio (Web Audio API) sur une piste micro brute.
- * La chaîne filtre les bruits indésirables avant envoi au contact :
- *
- *   [Micro brut]
- *       │
- *   [Filtre passe-haut 80 Hz]   → supprime les grondements graves (ventilo, basse fréquence)
- *       │
- *   [Filtre passe-bas 8000 Hz]  → atténue les sibilances et bruits de clavier aigus
- *       │
- *   [Compresseur dynamique]     → nivelle le volume, évite les pics et explosions sonores
- *       │
- *   [Destination = MediaStream] → flux filtré prêt pour PeerJS
- *
- * @param {MediaStream} rawStream - Le flux brut obtenu par getUserMedia
- * @returns {MediaStream} Un nouveau flux dont la piste audio est filtrée
- */
-function applyAudioFilter(rawStream) {
-  // Crée ou réutilise le contexte audio
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-  // Source = la piste micro brute
-  const source = audioCtx.createMediaStreamSource(rawStream);
-
-  // ── Filtre 1 : Passe-haut à 80 Hz ──────────────────────────────
-  // Coupe tout ce qui est en dessous de 80 Hz : grondements de ventilo,
-  // vibrations du bureau, basses fréquences parasites.
-  const highPass = audioCtx.createBiquadFilter();
-  highPass.type = 'highpass';
-  highPass.frequency.value = 80;   // Fréquence de coupure en Hz
-  highPass.Q.value = 0.7;          // Pente douce pour ne pas dénaturer la voix
-
-  // ── Filtre 2 : Passe-bas à 8000 Hz ─────────────────────────────
-  // Coupe les fréquences au-dessus de 8 kHz : clics de clavier, sifflements,
-  // bruits électroniques aigus. La voix humaine est essentiellement < 4 kHz,
-  // on garde donc une marge confortable.
-  const lowPass = audioCtx.createBiquadFilter();
-  lowPass.type = 'lowpass';
-  lowPass.frequency.value = 8000;  // Fréquence de coupure en Hz
-  lowPass.Q.value = 0.7;
-
-  // ── Filtre 3 : Compresseur dynamique ───────────────────────────
-  // Réduit la dynamique du signal : les sons forts sont atténués,
-  // les sons faibles sont maintenus. Effet "radio pro" qui rend la voix
-  // plus stable en volume et réduit l'impact des bruits soudains.
-  const compressor = audioCtx.createDynamicsCompressor();
-  compressor.threshold.value = -24; // En dB : en dessous, pas de compression
-  compressor.knee.value = 6;        // Zone de transition progressive (doux)
-  compressor.ratio.value = 3;       // Rapport de compression 3:1 (léger)
-  compressor.attack.value = 0.003;  // Réaction rapide (3 ms) aux pics
-  compressor.release.value = 0.25;  // Relâchement progressif (250 ms)
-
-  // ── Destination = un nouveau MediaStream ───────────────────────
-  // createMediaStreamDestination() crée un nœud dont la sortie est
-  // un MediaStream standard qu'on peut passer à PeerJS.
-  const dest = audioCtx.createMediaStreamDestination();
-
-  // Branchement en série : source → passe-haut → passe-bas → compresseur → sortie
-  source.connect(highPass);
-  highPass.connect(lowPass);
-  lowPass.connect(compressor);
-  compressor.connect(dest);
-
-  // Construit le flux de sortie final :
-  // - Piste audio = la sortie filtrée par la chaîne Web Audio
-  // - Piste vidéo = conservée intacte depuis le flux brut original
-  const outputStream = new MediaStream();
-  dest.stream.getAudioTracks().forEach(t => outputStream.addTrack(t));
-  rawStream.getVideoTracks().forEach(t => outputStream.addTrack(t));
-
-  filteredStream = outputStream;
-  return outputStream;
+// ══════════════════════════════════════════════════
+//  STATUS
+// ══════════════════════════════════════════════════
+function setStatus(state, label) {
+  const badge = document.getElementById('status-badge');
+  const text  = document.getElementById('status-text');
+  badge.className = state;
+  const labels = { offline:'Hors ligne', connecting:'Connexion…', connected:'Connecté ✓' };
+  text.textContent = label || labels[state] || state;
 }
 
+// ══════════════════════════════════════════════════
+//  ENCODE / DECODE
+// ══════════════════════════════════════════════════
+function encode(obj) {
+  return btoa(JSON.stringify(obj)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+function decode(str) {
+  str = str.replace(/-/g,'+').replace(/_/g,'/');
+  while (str.length%4) str += '=';
+  return JSON.parse(atob(str));
+}
+function buildLink(prefix, data) {
+  return location.href.split('#')[0] + prefix + encode(data);
+}
 
-// ── ACCÈS AUX MÉDIAS (caméra / micro) ───────────────────────────
-/**
- * Demande l'accès à la caméra et/ou au micro selon les options choisies,
- * puis applique le filtre audio sur la piste micro obtenue.
- *
- * ⚠️  CORRECTIONS (v2.4.0 → v2.5.0) :
- *
- * v2.4.0 — Bug "rien coché" :
- *   Si ni caméra ni micro n'étaient cochés, getUserMedia n'était jamais
- *   appelé → pas de popup de permission → appel sans flux.
- *   Correctif : forcer l'audio si rien n'est coché.
- *
- * v2.5.0 — Bug "caméra ignorée" :
- *   Quand video+audio étaient demandés simultanément avec facingMode:'user',
- *   certains navigateurs (Firefox, Safari mobile) échouaient silencieusement
- *   sur la contrainte video et renvoyaient uniquement l'audio.
- *   Correctif : stratégie de repli en 3 étapes (voir ci-dessous).
- *
- * v2.5.0 — Filtre audio :
- *   Le flux micro brut est désormais traité par une chaîne Web Audio API
- *   (passe-haut + passe-bas + compresseur) avant d'être transmis au contact.
- *
- * @returns {Promise<boolean>} true si au moins un flux a été obtenu, false sinon
- */
-async function getMedia() {
-  const h = parseInt(document.getElementById('qsel').value) || 720;
-  const wantVideo = mediaOpts.video;
-  const wantAudio = mediaOpts.audio;
+// ══════════════════════════════════════════════════
+//  QR CODE
+// ══════════════════════════════════════════════════
+function generateQR(containerId, text) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  qrGenerated[containerId] = true;
+  const size = Math.min(210, window.innerWidth - 80);
+  new QRCode(el, { text, width:size, height:size, colorDark:'#000', colorLight:'#fff', correctLevel:QRCode.CorrectLevel.M });
+}
 
-  // Si rien n'est coché, on force l'audio par défaut pour garantir
-  // que le navigateur affiche bien la popup de permission (bugfix v2.4.0)
-  const forceAudio = !wantVideo && !wantAudio;
+// ══════════════════════════════════════════════════
+//  WEBRTC
+// ══════════════════════════════════════════════════
+function createPC() {
+  const config = { iceServers:[
+    { urls:'stun:stun.l.google.com:19302' },
+    { urls:'stun:stun1.l.google.com:19302' },
+    { urls:'stun:stun.cloudflare.com:3478' }
+  ]};
+  return new RTCPeerConnection(config);
+}
 
-  // Contraintes audio avec traitements natifs du navigateur activés
-  // (ces traitements sont complémentaires à notre chaîne Web Audio)
-  const audioConstraints = {
-    echoCancellation: true,   // Annulation d'écho (retour du son du contact)
-    noiseSuppression: true,   // Suppression de bruit native du navigateur
-    autoGainControl: true     // Contrôle automatique du gain
+function setupDC(channel) {
+  dc = channel;
+  dc.onopen = () => {
+    setStatus('connected');
+    showScreen('chat-screen');
+    requestWakeLock();
+    addSystemMsg('🚀 Connexion établie !');
   };
-
-  // ── Stratégie de repli en 3 étapes pour la caméra (bugfix v2.5.0) ──
-  // Certains navigateurs échouent avec des contraintes vidéo trop strictes.
-  // On essaie du plus précis au plus permissif.
-  const videoConstraints = [
-    // Étape 1 : contraintes complètes avec résolution et orientation caméra
-    { width: { ideal: Math.round(h * 16 / 9) }, height: { ideal: h }, facingMode: 'user' },
-    // Étape 2 : résolution seulement, sans facingMode (compatible Firefox/Safari)
-    { width: { ideal: Math.round(h * 16 / 9) }, height: { ideal: h } },
-    // Étape 3 : aucune contrainte, on accepte n'importe quelle caméra disponible
-    true
-  ];
-
-  let rawStream = null;
-
-  if (wantVideo) {
-    // ── Cas avec caméra demandée : on essaie les contraintes par ordre ──
-    for (const vc of videoConstraints) {
-      try {
-        rawStream = await navigator.mediaDevices.getUserMedia({
-          video: vc,
-          audio: (wantAudio || forceAudio) ? audioConstraints : false
-        });
-        break; // Succès → on sort de la boucle
-      } catch (e) {
-        console.warn('getUserMedia tentative échouée:', e.name, '— essai suivant…');
-        // On continue avec les contraintes moins strictes
-      }
-    }
-    if (!rawStream) {
-      // Toutes les tentatives vidéo ont échoué → on tente en audio seul en dernier recours
-      console.warn('Caméra inaccessible, repli sur audio seul.');
-      try {
-        rawStream = await navigator.mediaDevices.getUserMedia({
-          video: false,
-          audio: audioConstraints
-        });
-        // La caméra n'a pas pu être obtenue, on le signale dans l'état
-        mediaOpts.video = false;
-      } catch (e) {
-        console.error('getUserMedia total fail:', e.name, e.message);
-        return false;
-      }
-    }
-  } else {
-    // ── Cas sans caméra (ou rien coché) : simple appel audio ──
+  dc.onclose = () => { setStatus('offline'); addSystemMsg('❌ Connexion perdue.'); };
+  dc.onmessage = (e) => {
     try {
-      rawStream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: (wantAudio || forceAudio) ? audioConstraints : false
-      });
-    } catch (e) {
-      console.error('getUserMedia error:', e.name, e.message);
-      return false;
-    }
-  }
-
-  // ── Application du filtre audio (Web Audio API) ─────────────────
-  // On ne filtre que si le flux contient une piste audio
-  if (rawStream.getAudioTracks().length > 0) {
-    try {
-      localStream = applyAudioFilter(rawStream);
-    } catch (e) {
-      // Si la Web Audio API échoue (très rare), on utilise le flux brut sans filtre
-      console.warn('Web Audio filter failed, using raw stream:', e);
-      localStream = rawStream;
-    }
-  } else {
-    localStream = rawStream; // Flux vidéo seul, pas de filtre à appliquer
-  }
-
-  // Affiche le flux local dans la petite fenêtre (coin de l'écran d'appel)
-  document.getElementById('lv').srcObject = localStream;
-
-  // Met à jour l'état des contrôles
-  micOn = wantAudio || forceAudio;
-  camOn = wantVideo && localStream.getVideoTracks().length > 0;
-
-  return true;
+      const obj = JSON.parse(e.data);
+      if (obj.__type === 'msg') addMsg(obj.text, 'them');
+    } catch { addMsg(e.data, 'them'); }
+  };
 }
 
-
-// ── GÉNÉRATION DU CODE PAIR ─────────────────────────────────────
-// Alphabet sans caractères ambigus (pas de 0/O, 1/I, etc.)
-const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-/**
- * Génère un code aléatoire lisible au format XXXX-XXXX-XXXX.
- * Ce code est aussi utilisé comme identifiant PeerJS (préfixé de "myvoc_").
- * @returns {string} Le code d'invitation
- */
-function makePeerId() {
-  let s = '';
-  for (let i = 0; i < 12; i++) {
-    if (i > 0 && i % 4 === 0) s += '-';
-    s += CHARS[Math.floor(Math.random() * CHARS.length)];
-  }
-  return s;
+function waitForICE(peer) {
+  return new Promise(resolve => {
+    if (peer.iceGatheringState === 'complete') return resolve();
+    peer.onicegatheringstatechange = () => { if (peer.iceGatheringState === 'complete') resolve(); };
+    setTimeout(resolve, 10000);
+  });
 }
 
-/**
- * Convertit le code lisible en identifiant PeerJS brut (sans tirets, avec préfixe).
- * Ex : "ABCD-EFGH-IJKL" → "myvoc_ABCDEFGHIJKL"
- * @param {string} code - Le code au format XXXX-XXXX-XXXX
- * @returns {string} L'id PeerJS
- */
-function rawId(code) { return 'myvoc_' + code.replace(/-/g, ''); }
+// ── REMOTE VIDEO TRACK ──
+function setupRemoteTracks() {
+  if (!pc) return;
+  pc.ontrack = (e) => {
+    const rv = document.getElementById('remote-video');
+    if (!rv.srcObject) rv.srcObject = new MediaStream();
+    rv.srcObject.addTrack(e.track);
 
+    e.track.onunmute = () => {
+      document.getElementById('remote-placeholder').classList.add('hidden');
+      showVideoArea();
+    };
+    e.track.onmute = () => {};
 
-// ── BARRE D'EXPIRATION DU CODE ──────────────────────────────────
-/**
- * Lance le compte à rebours de 5 minutes pour le code d'invitation.
- * Met à jour la barre de progression et le texte chaque seconde.
- * Détruit le peer (et donc le code) une fois expiré.
- */
-function startExpiry() {
-  expEnd = Date.now() + EXPIRY;
-  clearInterval(expInt);
-  const bar = document.getElementById('expBar');
-  const txt = document.getElementById('expTxt');
-
-  expInt = setInterval(() => {
-    const left = expEnd - Date.now(); // Millisecondes restantes
-
-    if (left <= 0) {
-      // Code expiré : on arrête le timer, on met tout en rouge, on détruit le peer
-      clearInterval(expInt);
-      bar.style.width = '0%';
-      bar.style.background = 'var(--danger)';
-      txt.textContent = 'Code expiré — créez un nouvel appel';
-      txt.classList.add('red');
-      document.getElementById('cDot').className = 'dot err';
-      document.getElementById('cStat').textContent = 'Code expiré';
-      peer?.destroy();
-      peer = null;
-      return;
-    }
-
-    // Calcul du pourcentage restant pour la barre
-    const pct = (left / EXPIRY) * 100;
-    bar.style.width = pct + '%';
-    // Couleur dynamique : vert → orange → rouge selon urgence
-    bar.style.background = pct < 20 ? 'var(--danger)' : pct < 40 ? '#e0b040' : 'var(--a3)';
-    txt.classList.toggle('red', pct < 20);
-
-    // Affichage MM:SS
-    const m = String(Math.floor(left / 60000)).padStart(2, '0');
-    const s = String(Math.floor((left % 60000) / 1000)).padStart(2, '0');
-    txt.textContent = `Expire dans ${m}:${s}`;
-  }, 1000);
+    // Try to play
+    rv.play().catch(()=>{});
+  };
 }
 
+// ══════════════════════════════════════════════════
+//  CREATOR FLOW
+// ══════════════════════════════════════════════════
+async function createCall() {
+  myRole = 'creator';
+  setStatus('connecting');
+  showScreen('create-screen');
 
-// ── CRÉATION D'UN APPEL ─────────────────────────────────────────
-/**
- * Lance la création d'un nouvel appel :
- * 1. Demande les permissions caméra/micro
- * 2. Génère un code d'invitation
- * 3. Crée un peer PeerJS et attend la connexion du second utilisateur
- * 4. Répond à l'appel entrant et affiche l'écran d'appel
- */
-async function startCreate() {
-  const btn = document.getElementById('genBtn');
-  btn.disabled = true;
-  btn.textContent = 'Initialisation…';
+  pc = createPC();
+  setupRemoteTracks();
 
-  // Vérification de la disponibilité de l'API media dans le navigateur
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    btn.disabled = false;
-    btn.textContent = 'Générer le code';
-    err('cerr', 'Votre navigateur ne supporte pas l\'accès aux médias. Utilisez Chrome ou Firefox sur HTTPS.');
-    return;
+  const channel = pc.createDataChannel('chat', { ordered:true });
+  setupDC(channel);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitForICE(pc);
+
+  const sdp = pc.localDescription;
+  const link = buildLink(HASH_PREFIX_OFFER, { sdp:sdp.sdp, type:sdp.type });
+  document.getElementById('offer-link').textContent = link;
+  generateQR('qr-code', link);
+}
+
+async function connectAnswer() {
+  const raw = document.getElementById('answer-input').value.trim();
+  if (!raw) return alert('Colle le lien de réponse de ton ami.');
+  const spinner = document.getElementById('connect-spinner');
+  spinner.classList.remove('hidden');
+  try {
+    let answerData;
+    if (raw.includes(HASH_PREFIX_ANSWER)) {
+      answerData = decode(raw.split(HASH_PREFIX_ANSWER)[1]);
+    } else { answerData = decode(raw); }
+    await pc.setRemoteDescription(new RTCSessionDescription(answerData));
+    setStatus('connecting','En attente…');
+  } catch(e) {
+    alert('Lien invalide.');
+    console.error(e);
+  } finally { spinner.classList.add('hidden'); }
+}
+
+// ══════════════════════════════════════════════════
+//  JOINER FLOW
+// ══════════════════════════════════════════════════
+async function joinFromHash(offerData) {
+  myRole = 'joiner';
+  setStatus('connecting');
+  showScreen('join-screen');
+
+  pc = createPC();
+  setupRemoteTracks();
+  pc.ondatachannel = (e) => { setupDC(e.channel); };
+
+  await pc.setRemoteDescription(new RTCSessionDescription(offerData));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitForICE(pc);
+
+  const sdp = pc.localDescription;
+  const link = buildLink(HASH_PREFIX_ANSWER, { sdp:sdp.sdp, type:sdp.type });
+
+  document.getElementById('join-qr-wrapper').classList.remove('hidden');
+  document.getElementById('answer-link').textContent = link;
+  generateQR('qr-code-answer', link);
+}
+
+async function joinFromLink() {
+  const raw = document.getElementById('join-link-input').value.trim();
+  if (!raw) return;
+  try {
+    let offerData;
+    if (raw.includes(HASH_PREFIX_OFFER)) { offerData = decode(raw.split(HASH_PREFIX_OFFER)[1]); }
+    else { offerData = decode(raw); }
+    await joinFromHash(offerData);
+  } catch(e) { alert('Lien invalide.'); console.error(e); }
+}
+
+// ══════════════════════════════════════════════════
+//  RENEGOTIATION (add/remove tracks)
+// ══════════════════════════════════════════════════
+async function renegotiate() {
+  if (!pc || pc.signalingState === 'closed') return;
+  if (myRole === 'creator') {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    dc.send(JSON.stringify({ __type:'sdp', sdp:pc.localDescription.sdp, type:pc.localDescription.type }));
   }
+}
 
-  // Demande des permissions et récupération du flux local
-  const ok = await getMedia();
-  if (!ok) {
-    btn.disabled = false;
-    btn.textContent = 'Générer le code';
-    err('cerr', 'Permission refusée ou périphérique indisponible. Vérifiez que le site est en HTTPS et que la caméra/micro ne sont pas utilisés par une autre application.');
-    return;
-  }
-
-  // Génère un code unique et crée le peer PeerJS avec cet id
-  myCode = makePeerId();
-  peer = new Peer(rawId(myCode), { debug: 0 });
-
-  // Gestion des erreurs PeerJS (ex : id déjà pris sur le réseau de signaling)
-  peer.on('error', e => {
-    if (e.type === 'unavailable-id') {
-      peer.destroy();
-      btn.disabled = false;
-      btn.textContent = 'Générer le code';
-      err('cerr', 'Code déjà pris, réessayez.');
+// Listen for renegotiation signals on dc
+function patchDCForSDP() {
+  if (!dc) return;
+  const origMsg = dc.onmessage;
+  dc.onmessage = async (e) => {
+    let obj;
+    try { obj = JSON.parse(e.data); } catch { return origMsg && origMsg(e); }
+    if (obj.__type === 'sdp') {
+      await pc.setRemoteDescription(new RTCSessionDescription({ sdp:obj.sdp, type:obj.type }));
+      if (obj.type === 'offer') {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        dc.send(JSON.stringify({ __type:'sdp', sdp:pc.localDescription.sdp, type:pc.localDescription.type }));
+      }
+    } else if (obj.__type === 'msg') {
+      addMsg(obj.text, 'them');
     } else {
-      err('cerr', 'Erreur: ' + e.type);
+      origMsg && origMsg(e);
     }
-  });
+  };
+}
 
-  // Le peer est prêt : on affiche le code et on attend la connexion du contact
-  peer.on('open', () => {
-    document.getElementById('codeBig').textContent = myCode;
-    document.getElementById('c2').style.display = 'block';
+// ══════════════════════════════════════════════════
+//  NOISE FILTER (Web Audio API)
+//  Uses a biquad high-pass + compressor to reduce
+//  low-frequency rumble and background noise
+// ══════════════════════════════════════════════════
+function buildNoiseChain(rawStream) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (micSource) micSource.disconnect();
+  if (noiseNode) noiseNode.disconnect();
 
-    // Affiche le bouton "Partager" si l'API Web Share est disponible (mobile)
-    if (navigator.share) document.getElementById('shBtn').style.display = 'block';
+  micSource = audioCtx.createMediaStreamSource(rawStream);
+  micDestination = audioCtx.createMediaStreamDestination();
 
-    startExpiry();    // Lance le compte à rebours de 5 min
-    generateQR(myCode); // Génère le QR code pour partager le lien
-    btn.disabled = false;
-    btn.textContent = 'Générer le code';
+  // High-pass filter: cut below 80Hz (rumble, HVAC)
+  const hpf = audioCtx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.value = 80;
 
-    // Attend la connexion du canal de données (chat) depuis le contact
-    peer.on('connection', dc => {
-      conn = dc;
-      setupDC(conn); // Configure les listeners pour le chat
+  // Dynamic compressor: duck loud transient noise
+  const comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -35;
+  comp.knee.value = 10;
+  comp.ratio.value = 4;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.25;
 
-      conn.on('open', () => {
-        // Une fois le canal data ouvert, attend l'appel média entrant
-        peer.on('call', inc => {
-          call = inc;
-          // Répond avec le flux local (ou un flux vide si pas de média)
-          call.answer(localStream || new MediaStream());
-          // Affiche le flux distant (caméra du contact) dans la grande vidéo
-          call.on('stream', rs => { document.getElementById('rv').srcObject = rs; });
-          call.on('close', hangUp);
+  // Gain boost to compensate compression
+  const gain = audioCtx.createGain();
+  gain.gain.value = 1.3;
+
+  micSource.connect(hpf);
+  hpf.connect(comp);
+  comp.connect(gain);
+  gain.connect(micDestination);
+
+  noiseNode = { hpf, comp, gain };
+  return micDestination.stream;
+}
+
+// ══════════════════════════════════════════════════
+//  MEDIA HELPERS
+// ══════════════════════════════════════════════════
+
+function showVideoArea() {
+  document.getElementById('video-area').classList.add('visible');
+  document.getElementById('media-controls').classList.add('visible');
+  mediaPanelOpen = true;
+  document.getElementById('media-toggle-btn').classList.add('active-btn');
+}
+
+function hideVideoArea() {
+  document.getElementById('video-area').classList.remove('visible');
+  document.getElementById('media-controls').classList.remove('visible');
+  mediaPanelOpen = false;
+  document.getElementById('media-toggle-btn').classList.remove('active-btn');
+}
+
+function toggleMediaPanel() {
+  if (mediaPanelOpen) hideVideoArea();
+  else showVideoArea();
+}
+
+function updateVideoLayout() {
+  const grid = document.getElementById('video-grid');
+  const localSlot = document.getElementById('local-slot');
+  const selfPip = document.getElementById('self-pip');
+  const rv = document.getElementById('remote-video');
+  const hasRemote = rv.srcObject && rv.srcObject.getVideoTracks().length > 0;
+  const hasLocal = camOn || screenOn;
+
+  if (hasLocal && hasRemote) {
+    // Show remote fullscreen + self as PIP
+    localSlot.classList.add('hidden');
+    selfPip.classList.remove('hidden');
+    grid.className = 'video-grid one';
+  } else if (hasLocal && !hasRemote) {
+    // Show local full
+    localSlot.classList.remove('hidden');
+    selfPip.classList.add('hidden');
+    grid.className = 'video-grid one';
+  } else {
+    // Remote only or nothing
+    localSlot.classList.add('hidden');
+    selfPip.classList.add('hidden');
+    grid.className = 'video-grid one';
+  }
+}
+
+// ── ADD / REPLACE TRACK IN PC ──
+function addOrReplaceTrack(stream, kind) {
+  if (!pc) return;
+  const newTrack = stream.getTracks().find(t => t.kind === kind);
+  if (!newTrack) return;
+  const sender = pc.getSenders().find(s => s.track && s.track.kind === kind);
+  if (sender) {
+    sender.replaceTrack(newTrack);
+  } else {
+    pc.addTrack(newTrack, stream);
+    renegotiate();
+  }
+}
+
+function removeTrack(kind) {
+  if (!pc) return;
+  const sender = pc.getSenders().find(s => s.track && s.track.kind === kind);
+  if (sender) {
+    pc.removeTrack(sender);
+    renegotiate();
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  TOGGLE MIC
+// ══════════════════════════════════════════════════
+async function toggleMic() {
+  const btn = document.getElementById('mic-btn');
+  if (!localStream) {
+    // Start mic
+    try {
+      const rawStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+      const audioTrack = rawStream.getAudioTracks()[0];
+      if (noiseActive) {
+        const filtered = buildNoiseChain(rawStream);
+        localStream = localStream || new MediaStream();
+        filtered.getAudioTracks().forEach(t => {
+          if (!localStream.getAudioTracks().length) localStream.addTrack(t);
         });
-        launchCall(); // Affiche l'écran d'appel
-      });
-    });
-  });
-}
-
-
-// ── REJOINDRE UN APPEL ──────────────────────────────────────────
-/**
- * Rejoint un appel existant avec le code saisi :
- * 1. Valide le code
- * 2. Demande les permissions caméra/micro
- * 3. Se connecte au peer distant
- * 4. Lance l'appel média et affiche l'écran d'appel
- */
-async function handleJoin() {
-  // Nettoie et valide le code saisi
-  const raw = document.getElementById('jinp').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (raw.length < 12) { err('jerr', 'Code invalide — il doit faire 12 caractères.'); return; }
-
-  // Reformate le code proprement et calcule l'id PeerJS cible
-  const fmt = raw.slice(0, 4) + '-' + raw.slice(4, 8) + '-' + raw.slice(8, 12);
-  const tid = rawId(fmt); // Id PeerJS du créateur de l'appel
-
-  // Vérification de la disponibilité de l'API media
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    err('jerr', 'Votre navigateur ne supporte pas l\'accès aux médias. Utilisez Chrome ou Firefox sur HTTPS.');
-    return;
-  }
-
-  // Demande les permissions et récupère le flux local
-  const ok = await getMedia();
-  if (!ok) {
-    err('jerr', 'Permission refusée ou périphérique indisponible. Vérifiez que le site est en HTTPS et que la caméra/micro ne sont pas utilisés ailleurs.');
-    return;
-  }
-
-  // Crée un peer avec un id aléatoire (côté "rejoignant", pas besoin d'id fixe)
-  peer = new Peer({ debug: 0 });
-
-  peer.on('error', e => {
-    // peer-unavailable = le code n'existe pas ou a expiré
-    err('jerr', e.type === 'peer-unavailable' ? 'Code introuvable ou expiré.' : 'Erreur: ' + e.type);
-    peer?.destroy();
-    peer = null;
-  });
-
-  peer.on('open', () => {
-    // Ouvre le canal de données vers le créateur (pour le chat)
-    conn = peer.connect(tid, { reliable: true });
-    setupDC(conn);
-
-    conn.on('open', () => {
-      // Lance l'appel média vers le créateur avec notre flux local
-      call = peer.call(tid, localStream || new MediaStream());
-      // Affiche le flux distant (caméra du créateur) dans la grande vidéo
-      call.on('stream', rs => { document.getElementById('rv').srcObject = rs; });
-      call.on('close', hangUp);
-      launchCall(); // Affiche l'écran d'appel
-    });
-
-    conn.on('error', () => err('jerr', 'Connexion refusée ou expirée.'));
-  });
-}
-
-
-// ── CANAL DE DONNÉES (CHAT) ─────────────────────────────────────
-/**
- * Configure les listeners sur le canal de données PeerJS.
- * Actuellement utilisé uniquement pour recevoir des messages de chat.
- * @param {DataConnection} dc - Le canal de données PeerJS
- */
-function setupDC(dc) {
-  dc.on('data', raw => {
-    try {
-      const m = JSON.parse(raw);
-      if (m.type === 'chat') {
-        addMsg(m.text, 'th'); // Affiche le message reçu ("th" = "them" = l'autre)
-        // Si le chat est fermé, incrémente le badge de messages non lus
-        if (!chatOpen || !wide()) {
-          unread++;
-          const b = document.getElementById('unr');
-          b.textContent = unread > 9 ? '9+' : unread;
-          b.classList.add('on');
-        }
+        addOrReplaceTrack(filtered, 'audio');
+      } else {
+        localStream = localStream || new MediaStream();
+        localStream.addTrack(audioTrack);
+        addOrReplaceTrack(localStream, 'audio');
       }
-    } catch {} // Ignore les messages non-JSON (ne devrait pas arriver)
-  });
-}
-
-
-// ── AFFICHAGE DE L'ÉCRAN D'APPEL ────────────────────────────────
-/**
- * Affiche l'interface d'appel et initialise tous les contrôles.
- * Appelé par les deux côtés (créateur et rejoignant) une fois la connexion établie.
- */
-function launchCall() {
-  clearInterval(expInt); // Arrête le compte à rebours du code (plus utile pendant l'appel)
-
-  // Bascule vers l'interface d'appel, masque l'écran de setup
-  document.getElementById('call').classList.add('on');
-  document.getElementById('app').style.display = 'none';
-
-  // Initialise l'état visuel de chaque bouton de contrôle
-  setCtrl('micB', 'micSl', micOn);   // Micro
-  setCtrl('camB', 'camSl', camOn);   // Caméra
-  setCtrl('scrB', 'scrSl', false);   // Partage d'écran (toujours OFF au départ)
-  setCtrl('spkB', 'spkSl', spkOn);   // Son (toujours ON au départ)
-
-  // Si pas de caméra, affiche le placeholder "appel audio" à la place
-  if (!camOn) { document.getElementById('novid').classList.add('on'); }
-
-  // Cache la petite vidéo locale si pas de caméra
-  if (!mediaOpts.video) document.getElementById('lv').style.display = 'none';
-
-  // Sur grand écran, ouvre le chat automatiquement
-  if (wide()) chatOpen = true;
-
-  // Démarre le chronomètre de durée d'appel
-  callSecs = 0;
-  callInt = setInterval(() => {
-    callSecs++;
-    const m = String(Math.floor(callSecs / 60)).padStart(2, '0');
-    const s = String(callSecs % 60).padStart(2, '0');
-    document.getElementById('timer').textContent = m + ':' + s;
-  }, 1000);
-}
-
-
-// ── CONTRÔLES DE L'APPEL ────────────────────────────────────────
-/**
- * Met à jour l'état visuel d'un bouton de contrôle (actif/inactif + barre de slash).
- * @param {string} b  - L'id du bouton
- * @param {string} s  - L'id de la barre de "slash" (icône barré quand inactif)
- * @param {boolean} on - true = actif, false = inactif
- */
-function setCtrl(b, s, on) {
-  document.getElementById(b).classList.toggle('off', !on);
-  if (s) document.getElementById(s).style.display = on ? 'none' : 'block';
-}
-
-/** Active/désactive le micro (coupe simplement la piste audio sans la supprimer). */
-function toggleMic() {
-  micOn = !micOn;
-  localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
-  setCtrl('micB', 'micSl', micOn);
-}
-
-/** Active/désactive la caméra (coupe la piste vidéo, rend la preview semi-transparente). */
-function toggleCam() {
-  camOn = !camOn;
-  localStream?.getVideoTracks().forEach(t => t.enabled = camOn);
-  document.getElementById('lv').style.opacity = camOn ? '1' : '0.3';
-  setCtrl('camB', 'camSl', camOn);
-}
-
-/**
- * Active/désactive le partage d'écran.
- * Quand actif : capture l'écran et remplace la piste vidéo dans l'appel WebRTC.
- * Quand désactivé : rétablit la piste de la caméra.
- */
-async function toggleScreen() {
-  if (!scrOn) {
-    // Vérification support navigateur
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert('Le partage d\'écran n\'est pas supporté par votre navigateur.');
-      return;
+      micMuted = false;
+      btn.classList.add('active');
+      btn.textContent = '🎙️';
+      showVideoArea();
+      addSystemMsg('🎙️ Micro activé');
+    } catch(e) { addSystemMsg('⚠️ Impossible d\'accéder au micro'); console.error(e); }
+  } else {
+    // Toggle mute
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length) {
+      micMuted = !micMuted;
+      audioTracks.forEach(t => t.enabled = !micMuted);
+      btn.classList.toggle('active', !micMuted);
+      btn.textContent = micMuted ? '🔇' : '🎙️';
+      addSystemMsg(micMuted ? '🔇 Micro coupé' : '🎙️ Micro activé');
     }
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  TOGGLE NOISE FILTER
+// ══════════════════════════════════════════════════
+async function toggleNoise() {
+  noiseActive = !noiseActive;
+  const btn = document.getElementById('noise-btn');
+  btn.classList.toggle('on', noiseActive);
+
+  // If mic is already on, rebuild chain
+  if (localStream && localStream.getAudioTracks().length) {
     try {
-      // Capture l'écran (affiche une popup de sélection dans le navigateur)
-      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
-      const track = screenStream.getVideoTracks()[0];
+      const rawStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+      if (noiseActive) {
+        const filtered = buildNoiseChain(rawStream);
+        const ft = filtered.getAudioTracks()[0];
+        const existing = pc ? pc.getSenders().find(s => s.track && s.track.kind==='audio') : null;
+        if (existing) existing.replaceTrack(ft);
+        addSystemMsg('✨ Filtre bruit activé');
+      } else {
+        const rt = rawStream.getAudioTracks()[0];
+        const existing = pc ? pc.getSenders().find(s => s.track && s.track.kind==='audio') : null;
+        if (existing) existing.replaceTrack(rt);
+        if (micSource) micSource.disconnect();
+        addSystemMsg('🎙️ Filtre bruit désactivé');
+      }
+    } catch(e) {}
+  } else {
+    addSystemMsg(noiseActive ? '✨ Filtre bruit activé (démarre le micro d\'abord)' : '🎙️ Filtre bruit désactivé');
+  }
+}
 
-      // Remplace la piste vidéo dans la connexion WebRTC (sans recréer l'appel)
-      const sender = call?.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) { sender.replaceTrack(track); }
+// ══════════════════════════════════════════════════
+//  TOGGLE CAM
+// ══════════════════════════════════════════════════
+async function toggleCam() {
+  const btn = document.getElementById('cam-btn');
+  if (!camOn) {
+    try {
+      // Stop screen share if on
+      if (screenOn) await stopScreen();
 
-      // Affiche l'écran partagé dans la petite vidéo locale
-      document.getElementById('lv').srcObject = screenStream;
-      document.getElementById('lv').style.display = 'block';
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user' }, audio: !localStream || !localStream.getAudioTracks().length });
+      if (!localStream) localStream = new MediaStream();
 
-      // Si l'utilisateur arrête le partage via le bouton natif du navigateur
-      track.onended = () => { if (scrOn) toggleScreen(); };
-      scrOn = true;
-    } catch (e) {
-      console.error('getDisplayMedia error:', e); // L'utilisateur a annulé, ou accès refusé
-      return;
+      stream.getVideoTracks().forEach(t => localStream.addTrack(t));
+      if (!localStream.getAudioTracks().length) {
+        stream.getAudioTracks().forEach(t => localStream.addTrack(t));
+      }
+
+      const lv = document.getElementById('local-video');
+      const pv = document.getElementById('self-pip-video');
+      lv.srcObject = stream;
+      pv.srcObject = stream;
+      lv.play().catch(()=>{});
+      pv.play().catch(()=>{});
+
+      addOrReplaceTrack(stream, 'video');
+      addOrReplaceTrack(stream, 'audio');
+
+      camOn = true;
+      btn.classList.add('active');
+      btn.textContent = '📷';
+      showVideoArea();
+      updateVideoLayout();
+      addSystemMsg('📷 Caméra activée');
+    } catch(e) {
+      addSystemMsg('⚠️ Impossible d\'accéder à la caméra');
+      console.error(e);
     }
   } else {
-    // Rétablit la piste de la caméra dans l'appel WebRTC
-    const camTrack = localStream?.getVideoTracks()[0];
-    const sender = call?.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
-    if (sender && camTrack) { sender.replaceTrack(camTrack); }
-    else if (sender) { sender.replaceTrack(null); }
-
-    // Remet le flux de la caméra dans la preview locale (ou cache si pas de caméra)
-    document.getElementById('lv').srcObject = localStream || null;
-    if (!localStream) document.getElementById('lv').style.display = 'none';
-
-    // Libère les ressources du flux écran
-    screenStream?.getTracks().forEach(t => t.stop());
-    screenStream = null;
-    scrOn = false;
+    // Stop cam
+    if (localStream) {
+      localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+    }
+    removeTrack('video');
+    camOn = false;
+    btn.classList.remove('active');
+    btn.textContent = '📷';
+    updateVideoLayout();
+    addSystemMsg('📷 Caméra désactivée');
   }
-  setCtrl('scrB', 'scrSl', scrOn);
 }
 
-/** Active/désactive le son du correspondant (mute/unmute la vidéo distante). */
-function toggleSpk() {
-  spkOn = !spkOn;
-  document.getElementById('rv').muted = !spkOn;
-  setCtrl('spkB', 'spkSl', spkOn);
+// ══════════════════════════════════════════════════
+//  TOGGLE SCREEN SHARE
+// ══════════════════════════════════════════════════
+async function toggleScreen() {
+  if (!screenOn) {
+    await startScreen();
+  } else {
+    await stopScreen();
+  }
 }
 
+async function startScreen() {
+  if (!navigator.mediaDevices.getDisplayMedia) {
+    addSystemMsg('⚠️ Partage d\'écran non supporté sur cet appareil');
+    return;
+  }
+  try {
+    if (camOn) await stopCam();
 
-// ── CHAT ────────────────────────────────────────────────────────
-/**
- * Ouvre/ferme le panneau de chat.
- * Sur mobile, le panneau glisse depuis le bas.
- * Sur desktop, il est affiché en colonne sur le côté.
- */
-function toggleChat() {
-  chatOpen = !chatOpen;
-  const p = document.getElementById('cp');
-  p.classList.toggle('open', chatOpen);
-  document.getElementById('chtB').classList.toggle('chon', chatOpen);
-  // Réinitialise le badge de non-lus quand on ouvre le chat
-  if (chatOpen) { unread = 0; document.getElementById('unr').classList.remove('on'); }
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video:true, audio:true });
+    const lv = document.getElementById('local-video');
+    const pv = document.getElementById('self-pip-video');
+    lv.srcObject = screenStream;
+    pv.srcObject = screenStream;
+    lv.play().catch(()=>{});
+    pv.play().catch(()=>{});
+
+    addOrReplaceTrack(screenStream, 'video');
+    if (screenStream.getAudioTracks().length) addOrReplaceTrack(screenStream, 'audio');
+
+    screenOn = true;
+    document.getElementById('screen-btn').classList.add('active');
+    document.getElementById('screen-btn').textContent = '🖥️';
+    showVideoArea();
+    updateVideoLayout();
+    addSystemMsg('🖥️ Partage d\'écran démarré');
+
+    // Handle when user stops via browser UI
+    screenStream.getVideoTracks()[0].onended = () => stopScreen();
+  } catch(e) {
+    if (e.name !== 'NotAllowedError') addSystemMsg('⚠️ Partage d\'écran annulé');
+    console.error(e);
+  }
 }
 
-/**
- * Envoie un message via le canal de données PeerJS.
- * Affiche le message côté local et le transmet au contact.
- */
+async function stopScreen() {
+  if (screenStream) {
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+  }
+  removeTrack('video');
+  screenOn = false;
+  document.getElementById('screen-btn').classList.remove('active');
+  document.getElementById('screen-btn').textContent = '🖥️';
+  updateVideoLayout();
+  addSystemMsg('🖥️ Partage d\'écran arrêté');
+}
+
+async function stopCam() {
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+  }
+  removeTrack('video');
+  camOn = false;
+  document.getElementById('cam-btn').classList.remove('active');
+  updateVideoLayout();
+}
+
+// ══════════════════════════════════════════════════
+//  STOP ALL MEDIA
+// ══════════════════════════════════════════════════
+function stopAllMedia() {
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  micSource = null; noiseNode = null; micDestination = null;
+  camOn = false; screenOn = false; micMuted = false; noiseActive = false;
+  document.getElementById('cam-btn').classList.remove('active');
+  document.getElementById('screen-btn').classList.remove('active');
+  document.getElementById('mic-btn').classList.remove('active');
+  document.getElementById('mic-btn').textContent = '🎙️';
+  document.getElementById('noise-btn').classList.remove('on');
+  hideVideoArea();
+  updateVideoLayout();
+}
+
+// ══════════════════════════════════════════════════
+//  CHAT
+// ══════════════════════════════════════════════════
 function sendMsg() {
-  const inp = document.getElementById('ci');
-  const text = inp.value.trim();
-  if (!text || !conn || !conn.open) return; // Ne fait rien si vide ou pas connecté
-  try { conn.send(JSON.stringify({ type: 'chat', text })); } catch { return; }
-  addMsg(text, 'me'); // Affiche le message côté expéditeur
-  inp.value = '';
-  inp.style.height = '';
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !dc || dc.readyState !== 'open') return;
+  dc.send(JSON.stringify({ __type:'msg', text }));
+  addMsg(text, 'me');
+  input.value = '';
+  input.style.height = '';
 }
 
-/**
- * Ajoute un message dans la zone de chat.
- * @param {string} text - Le texte du message
- * @param {string} who  - 'me' (envoyé) ou 'th' (reçu)
- */
 function addMsg(text, who) {
-  document.getElementById('cempty')?.remove(); // Supprime le placeholder "Aucun message"
-  const b = document.getElementById('msgs');
-  const d = document.createElement('div');
-  d.className = 'msg ' + who;
-  // Formate l'heure en HH:MM
-  const now = new Date();
-  const t = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-  d.innerHTML = `<div>${esc(text)}</div><div class="mtime">${t}</div>`;
-  b.appendChild(d);
-  b.scrollTop = b.scrollHeight; // Scroll automatique vers le bas
+  const msgs = document.getElementById('messages');
+  const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const el = document.createElement('div');
+  el.className = `msg ${who}`;
+  el.innerHTML = `<div>${escapeHtml(text)}</div><div class="msg-time">${now}</div>`;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
 }
 
-/**
- * Échappe les caractères HTML spéciaux pour éviter les injections XSS.
- * @param {string} s - La chaîne à échapper
- * @returns {string} La chaîne sécurisée
- */
-function esc(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function addSystemMsg(text) {
+  const msgs = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'system-msg';
+  el.textContent = text;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
 }
 
-/**
- * Redimensionne automatiquement le textarea du chat selon son contenu.
- * Limité à 90px de hauteur maximum.
- * @param {HTMLTextAreaElement} el
- */
-function autoR(el) {
-  el.style.height = '';
-  el.style.height = Math.min(el.scrollHeight, 90) + 'px';
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
-
-// ── FIN D'APPEL ─────────────────────────────────────────────────
-/**
- * Raccroche et nettoie toutes les ressources :
- * - Arrête les timers
- * - Ferme l'appel et la connexion de données PeerJS
- * - Libère les flux média (caméra, micro, partage d'écran)
- * - Réinitialise l'interface et retourne à l'écran d'accueil
- */
-function hangUp() {
-  clearInterval(callInt);
-  clearInterval(expInt);
-
-  // Ferme les connexions PeerJS
-  call?.close();
-  conn?.close();
-  peer?.destroy();
-  call = null; conn = null; peer = null;
-
-  // Libère les pistes média (important pour éteindre l'indicateur caméra/micro)
-  localStream?.getTracks().forEach(t => t.stop());
-  localStream = null;
-  filteredStream?.getTracks().forEach(t => t.stop());
-  filteredStream = null;
-  screenStream?.getTracks().forEach(t => t.stop());
-  screenStream = null;
-
-  // Ferme le contexte Web Audio pour libérer les ressources processeur
-  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
-
-  // Vide les éléments vidéo
-  document.getElementById('rv').srcObject = null;
-  document.getElementById('lv').srcObject = null;
-
-  // Retour à l'interface de setup
-  document.getElementById('call').classList.remove('on');
-  document.getElementById('app').style.display = '';
-  resetAll();
-  goTo('homeScreen');
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight,110)+'px';
 }
 
-
-// ── COPIE / PARTAGE DU CODE ─────────────────────────────────────
-/**
- * Copie le lien d'invitation (avec le code dans le hash URL) dans le presse-papiers.
- * Affiche un retour visuel temporaire sur le bouton.
- */
-function copyCode() {
-  const b = document.getElementById('cpBtn');
-  const url = location.href.split('#')[0] + '#join=' + myCode;
-  navigator.clipboard.writeText(url).then(() => {
-    b.textContent = 'Lien copié';
-    b.classList.add('ok');
-    setTimeout(() => { b.textContent = 'Copier le lien'; b.classList.remove('ok'); }, 2200);
+// ══════════════════════════════════════════════════
+//  COPY LINK
+// ══════════════════════════════════════════════════
+function copyLink(elId) {
+  const text = document.getElementById(elId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'),2000);
   });
 }
 
-/**
- * Utilise l'API Web Share (mobile) pour partager le lien d'invitation.
- * N'est disponible que sur les navigateurs qui supportent navigator.share.
- */
-function shareCode() {
-  const url = location.href.split('#')[0] + '#join=' + myCode;
-  navigator.share?.({ title: "my'voc — Invitation", url: url, text: `Rejoins mon appel sur my'voc` }).catch(() => {});
-}
-
-
-// ── UTILITAIRES ─────────────────────────────────────────────────
-/**
- * Affiche un message d'erreur dans une boîte d'erreur identifiée.
- * @param {string} id  - L'id de l'élément .ebox
- * @param {string} msg - Le message à afficher
- */
-function err(id, msg) {
-  const e = document.getElementById(id);
-  e.textContent = msg;
-  e.style.display = 'block';
-}
-
-/**
- * Remet l'interface complète dans son état initial.
- * Appelé après un raccrochet ou un retour à l'accueil.
- */
-function resetAll() {
-  // Cache le panneau avec le code d'invitation
-  ['c2'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
-
-  // Réinitialise les messages d'erreur
-  document.getElementById('cerr').style.display = 'none';
-  document.getElementById('jerr').style.display = 'none';
-
-  // Réinitialise l'affichage du code et du champ de saisie
-  document.getElementById('codeBig').textContent = '—';
-  document.getElementById('jinp').value = '';
-
-  // Réinitialise la barre d'expiration
-  document.getElementById('expBar').style.width = '100%';
-  document.getElementById('expBar').style.background = 'var(--a3)';
-  document.getElementById('expTxt').textContent = 'Expire dans 5:00';
-  document.getElementById('expTxt').classList.remove('red');
-
-  // Réinitialise l'indicateur de statut de connexion
-  document.getElementById('cDot').className = 'dot pulse';
-  document.getElementById('cStat').textContent = 'En attente que votre contact rejoigne…';
-
-  // Réinitialise le chat
-  document.getElementById('msgs').innerHTML = '<div class="cempty" id="cempty">Aucun message</div>';
-  document.getElementById('cp').classList.remove('open');
-  document.getElementById('chtB').classList.remove('chon');
-  chatOpen = false;
-  unread = 0;
-  document.getElementById('unr').classList.remove('on');
-
-  // Réinitialise les options média (décocher caméra et micro)
-  mediaOpts = { video: false, audio: false };
-  document.getElementById('opt-video').classList.remove('on');
-  document.getElementById('opt-audio').classList.remove('on');
-
-  // Réinitialise tous les états booléens
-  micOn = false; camOn = false; scrOn = false; spkOn = true; myCode = '';
-
-  // Réinitialise l'interface vidéo de l'écran d'appel
-  document.getElementById('novid').classList.remove('on');
-  document.getElementById('rv').style.display = 'block';
-  document.getElementById('lv').style.display = 'block';
-  document.getElementById('lv').style.opacity = '1';
-  document.getElementById('shBtn').style.display = 'none';
-
-  // Réactive le bouton de génération
-  const gb = document.getElementById('genBtn');
-  gb.disabled = false;
-  gb.textContent = 'Générer le code';
-}
-
-
-// ── QR CODE ─────────────────────────────────────────────────────
-/**
- * Génère un QR code contenant l'URL d'invitation et l'affiche dans l'interface.
- * L'URL inclut le code dans le hash (#join=XXXX-XXXX-XXXX).
- * @param {string} code - Le code d'invitation
- */
-function generateQR(code) {
-  const wrap = document.getElementById('qrWrap');
-  const box = document.getElementById('qrCanvas');
-  box.innerHTML = ''; // Vide le QR précédent si existant
-
-  const url = location.href.split('#')[0] + '#join=' + code;
-  try {
-    new QRCode(box, {
-      text: url,
-      width: 180, height: 180,
-      colorDark: '#1a1a2e', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M // Niveau de correction d'erreur moyen
-    });
-    wrap.style.display = 'flex';
-  } catch (e) {
-    wrap.style.display = 'none'; // Cache la section QR si la lib échoue
-  }
-}
-
-
-// ── AUTO-REMPLISSAGE VIA URL ─────────────────────────────────────
-/**
- * Détecte si l'URL contient un code d'invitation dans le hash (#join=XXXX-XXXX-XXXX).
- * Si oui, bascule vers l'écran "Rejoindre" et pré-remplit le champ avec le code.
- * Utilisé quand on ouvre un lien ou scanne un QR code.
- */
-function checkHashJoin() {
+// ══════════════════════════════════════════════════
+//  ON LOAD
+// ══════════════════════════════════════════════════
+function checkHash() {
   const hash = location.hash;
-  if (!hash) return;
-
-  // Cherche un code au format XXXX-XXXX-XXXX dans le hash
-  const m = hash.match(/[#&]join=([A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})/i);
-  if (!m) return;
-
-  const code = m[1].toUpperCase();
-  goTo('joinScreen');
-  document.getElementById('jinp').value = code;
-  document.getElementById('autojoinBanner').style.display = 'block'; // Affiche le bandeau "code détecté"
-
-  // Supprime le hash de l'URL sans recharger la page (évite la confusion si l'on partage l'URL ensuite)
-  history.replaceState(null, '', location.pathname + location.search);
-}
-
-
-// ── WAKE LOCK (empêche l'écran de s'éteindre pendant l'appel) ───
-let wl = null;
-
-/**
- * Active le wake lock pour empêcher l'appareil de se mettre en veille pendant l'appel.
- * Utilise l'API WakeLock si disponible, avec un fallback via une canvas animée invisible.
- */
-async function wakeUp() {
-  // Tentative d'activation du wake lock natif (Chrome/Android)
-  if ('wakeLock' in navigator) try { wl = await navigator.wakeLock.request('screen'); } catch {}
-
-  // Fallback : canvas 1×1 qui s'anime en continu pour garder la page active
-  const cv = document.createElement('canvas');
-  cv.width = 1; cv.height = 1;
-  const cx = cv.getContext('2d');
-  const v = document.getElementById('wv'); // Vidéo invisible dans le DOM (voir HTML)
-  try {
-    const s = cv.captureStream(1); // Capture la canvas comme flux vidéo
-    v.srcObject = s;
-    v.play().catch(() => {});
-    // Dessine un pixel quasi-transparent en boucle pour maintenir l'activité
-    (function f() { cx.fillStyle = 'rgba(0,0,0,0.01)'; cx.fillRect(0, 0, 1, 1); requestAnimationFrame(f); })();
-  } catch {}
-}
-
-// Si l'onglet redevient visible et que le wake lock a été libéré, on le réactive
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && !wl) wakeUp();
-});
-wakeUp();
-
-// Sur grand écran, s'assure que le chat reste ouvert quand on agrandit la fenêtre
-window.addEventListener('resize', () => {
-  if (wide() && document.getElementById('call').classList.contains('on')) {
-    chatOpen = true;
-    document.getElementById('chtB').classList.add('chon');
+  if (hash.startsWith(HASH_PREFIX_OFFER)) {
+    try {
+      const data = decode(hash.slice(HASH_PREFIX_OFFER.length));
+      history.replaceState(null,'',location.pathname);
+      joinFromHash(data);
+    } catch(e) { console.error('Hash invalid',e); }
   }
+}
+
+// Start invisible wake video immediately
+window.addEventListener('DOMContentLoaded', () => {
+  const v = document.getElementById('wake-video');
+  // Modern browsers need a user gesture; we'll try on first interaction too
+  v.play().catch(()=>{});
+  document.addEventListener('click', () => v.play().catch(()=>{}), { once:true });
 });
 
-// ── INITIALISATION ───────────────────────────────────────────────
-// Vérifie si un code est présent dans l'URL dès le chargement de la page
-checkHashJoin();
-
-// Avertit l'utilisateur si le site est ouvert en HTTP (la caméra/micro nécessitent HTTPS)
-if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-  const w = document.createElement('div');
-  w.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#c03030;color:#fff;text-align:center;padding:10px 16px;font-family:Syne,sans-serif;font-size:.82rem;font-weight:700;';
-  w.textContent = '⚠ Ce site doit être ouvert en HTTPS pour accéder à la caméra et au micro.';
-  document.body.prepend(w);
-}
-// v2.5.0
+window.addEventListener('load', checkHash);
+window.addEventListener('hashchange', checkHash);
 </script>
 </body>
 </html>
