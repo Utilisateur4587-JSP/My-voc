@@ -4,18 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>P2P Call</title>
+
+  <!--
+    ============================================================
+    LIBRAIRIE EXTERNE : PeerJS v1.5.2
+    ------------------------------------------------------------
+    PeerJS est une librairie qui simplifie WebRTC.
+    Elle gère le "signaling" (échange des codes de connexion)
+    via leur serveur gratuit. L'appel lui-même est peer-to-peer.
+    
+    IMPORTANT : Cette librairie nécessite une connexion internet
+    pour fonctionner (juste pour le signaling initial).
+    ============================================================
+  -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
   <style>
+    /* ============================================================
+       STYLES GLOBAUX
+       ============================================================ */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: monospace; background: #111; color: #eee; min-height: 100vh; padding: 20px; }
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #eee;
+      min-height: 100vh;
+      padding: 20px;
+    }
     h1 { text-align: center; margin-bottom: 30px; font-size: 1.5rem; letter-spacing: 2px; }
     .container { max-width: 600px; margin: 0 auto; }
-    .card { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-    .card h2 { margin-bottom: 15px; font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* --- Cartes (panneaux) --- */
+    .card {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      margin-bottom: 15px;
+      font-size: 1rem;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* --- Boutons --- */
     button {
       background: #2a2a2a; color: #eee; border: 1px solid #555;
       padding: 10px 20px; border-radius: 4px; cursor: pointer;
       font-family: monospace; font-size: 0.9rem; margin: 5px 5px 5px 0;
+      transition: background 0.15s;
     }
     button:hover { background: #3a3a3a; }
     button.primary { background: #1a4a1a; border-color: #2d8a2d; color: #7fff7f; }
@@ -23,11 +63,15 @@
     button.danger { background: #4a1a1a; border-color: #8a2d2d; color: #ff7f7f; }
     button.danger:hover { background: #5a2323; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* --- Input texte (pour le code à rejoindre) --- */
     input[type="text"] {
       width: 100%; background: #0a0a0a; color: #0f0; border: 1px solid #333;
       border-radius: 4px; padding: 10px; font-family: monospace; font-size: 1rem;
       letter-spacing: 2px;
     }
+
+    /* --- Affichage du code d'appel (grand, cliquable) --- */
     .code-display {
       font-size: 2rem; letter-spacing: 6px; color: #7fff7f;
       background: #0a0a0a; border: 1px solid #2d8a2d;
@@ -35,24 +79,60 @@
       margin: 10px 0; cursor: pointer; user-select: all;
     }
     .code-display:hover { background: #0f1a0f; }
+
+    /* --- Labels et textes secondaires --- */
     .label { font-size: 0.8rem; color: #888; margin-bottom: 5px; display: block; }
     .section { margin-bottom: 15px; }
+    .hint { font-size: 0.75rem; color: #555; margin-top: 8px; }
+
+    /* --- Barre de statut --- */
     #status {
-      text-align: center; padding: 10px; border-radius: 4px;
+      text-align: center; padding: 12px; border-radius: 4px;
       background: #1a1a1a; border: 1px solid #333;
       margin-bottom: 20px; font-size: 0.85rem; color: #aaa;
+      line-height: 1.5;
     }
     #status.connected { border-color: #2d8a2d; color: #7fff7f; background: #0a1a0a; }
-    #status.error { border-color: #8a2d2d; color: #ff7f7f; background: #1a0a0a; }
-    #status.waiting { border-color: #8a6a2d; color: #ffdd7f; background: #1a160a; }
+    #status.error     { border-color: #8a2d2d; color: #ff7f7f; background: #1a0a0a; }
+    #status.waiting   { border-color: #8a6a2d; color: #ffdd7f; background: #1a160a; }
+    #status.warning   { border-color: #6a5a2d; color: #ffcc55; background: #18140a; }
+
+    /* --- Bloc d'erreur bloquant (ex: pas HTTPS) --- */
+    #fatal-error {
+      display: none; /* Caché par défaut, affiché si erreur critique */
+      background: #2a0a0a;
+      border: 2px solid #8a2d2d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      color: #ff9f9f;
+      line-height: 1.6;
+    }
+    #fatal-error h2 { color: #ff5f5f; margin-bottom: 10px; }
+    #fatal-error code {
+      background: #1a0000;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    /* --- Contrôles média (pendant l'appel) --- */
     .media-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+    /* --- Vidéos --- */
     #videos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
     .video-wrap { flex: 1; min-width: 200px; }
     video { background: #000; border: 1px solid #333; border-radius: 4px; width: 100%; }
-    .hidden { display: none; }
-    #main-menu { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+
+    /* --- Menu principal --- */
+    #main-menu {
+      display: flex; gap: 10px; justify-content: center;
+      margin-bottom: 20px; flex-wrap: wrap;
+    }
     #main-menu button { font-size: 1rem; padding: 15px 30px; }
-    .hint { font-size: 0.75rem; color: #555; margin-top: 8px; }
+
+    /* --- Utilitaire --- */
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -60,269 +140,772 @@
 <div class="container">
   <h1>📞 P2P CALL</h1>
 
-  <div id="status">En attente...</div>
-
-  <!-- MAIN MENU -->
-  <div id="main-menu">
-    <button class="primary" onclick="showMode('create')">📡 Créer un appel</button>
-    <button onclick="showMode('join')">🔗 Rejoindre un appel</button>
+  <!--
+    BLOC D'ERREUR FATALE
+    Affiché à la place de tout le reste si une condition critique
+    empêche l'appli de fonctionner (ex: pas HTTPS, pas de WebRTC...)
+  -->
+  <div id="fatal-error">
+    <h2 id="fatal-title">❌ Erreur</h2>
+    <p id="fatal-message">Une erreur est survenue.</p>
   </div>
 
-  <!-- CREATE PANEL -->
-  <div id="panel-create" class="card hidden">
-    <h2>Créer un appel</h2>
-    <div class="section">
-      <span class="label">Ton code d'appel (clique pour copier)</span>
-      <div class="code-display" id="my-code" onclick="copyCode()">...</div>
-      <p class="hint">⏳ En attente que quelqu'un rejoigne avec ce code...</p>
-    </div>
-  </div>
+  <!--
+    CONTENU PRINCIPAL
+    Tout ce bloc est caché si une erreur fatale est détectée au démarrage
+  -->
+  <div id="app-content">
 
-  <!-- JOIN PANEL -->
-  <div id="panel-join" class="card hidden">
-    <h2>Rejoindre un appel</h2>
-    <div class="section">
-      <span class="label">Code de la personne à appeler</span>
-      <input type="text" id="peer-code-input" placeholder="ex: ABC-123" maxlength="10" oninput="this.value=this.value.toUpperCase()" />
-      <button class="primary" style="margin-top:10px" onclick="joinCall()">📞 Appeler</button>
-    </div>
-  </div>
+    <!-- Barre de statut : affiche l'état courant de l'appli -->
+    <div id="status">En attente...</div>
 
-  <!-- IN-CALL CONTROLS -->
-  <div id="call-panel" class="card hidden">
-    <h2>🟢 Appel en cours</h2>
-    <div class="media-controls">
-      <button id="btn-mic" onclick="toggleMic()">🎤 Micro : ON</button>
-      <button id="btn-cam" onclick="toggleCam()">📷 Caméra : OFF</button>
-      <button id="btn-screen" onclick="toggleScreen()">🖥️ Écran : OFF</button>
-      <button id="btn-speaker" onclick="toggleSpeaker()">🔊 Son : ON</button>
-      <button class="danger" onclick="hangUp()">📵 Raccrocher</button>
+    <!-- ======================================================
+         MENU PRINCIPAL : choix créer ou rejoindre
+         ====================================================== -->
+    <div id="main-menu">
+      <button class="primary" onclick="showMode('create')">📡 Créer un appel</button>
+      <button onclick="showMode('join')">🔗 Rejoindre un appel</button>
     </div>
-    <div id="videos">
-      <div class="video-wrap">
-        <span class="label">Toi</span>
-        <video id="local-video" autoplay muted playsinline></video>
-      </div>
-      <div class="video-wrap">
-        <span class="label">Correspondant</span>
-        <video id="remote-video" autoplay playsinline></video>
+
+    <!-- ======================================================
+         PANNEAU CRÉER UN APPEL
+         Affiché quand l'utilisateur veut héberger l'appel.
+         Le code généré est à envoyer à l'autre personne.
+         ====================================================== -->
+    <div id="panel-create" class="card hidden">
+      <h2>Créer un appel</h2>
+      <div class="section">
+        <span class="label">Ton code d'appel (clique pour copier)</span>
+        <!-- Le code est affiché ici une fois PeerJS connecté -->
+        <div class="code-display" id="my-code" onclick="copyCode()">...</div>
+        <p class="hint">⏳ En attente que quelqu'un rejoigne avec ce code...</p>
       </div>
     </div>
-  </div>
-</div>
+
+    <!-- ======================================================
+         PANNEAU REJOINDRE UN APPEL
+         Affiché quand l'utilisateur veut rejoindre un appel existant.
+         ====================================================== -->
+    <div id="panel-join" class="card hidden">
+      <h2>Rejoindre un appel</h2>
+      <div class="section">
+        <span class="label">Code de la personne à appeler</span>
+        <input
+          type="text"
+          id="peer-code-input"
+          placeholder="ex: ABC-123"
+          maxlength="10"
+          oninput="this.value=this.value.toUpperCase()"
+        />
+        <button class="primary" style="margin-top:10px" onclick="joinCall()">📞 Appeler</button>
+      </div>
+    </div>
+
+    <!-- ======================================================
+         PANNEAU APPEL EN COURS
+         Affiché uniquement quand la connexion P2P est établie.
+         Contient les contrôles média et les flux vidéo.
+         ====================================================== -->
+    <div id="call-panel" class="card hidden">
+      <h2>🟢 Appel en cours</h2>
+
+      <!-- Boutons de contrôle -->
+      <div class="media-controls">
+        <button id="btn-mic"     onclick="toggleMic()">🎤 Micro : ON</button>
+        <button id="btn-cam"     onclick="toggleCam()">📷 Caméra : OFF</button>
+        <button id="btn-screen"  onclick="toggleScreen()">🖥️ Écran : OFF</button>
+        <button id="btn-speaker" onclick="toggleSpeaker()">🔊 Son : ON</button>
+        <button class="danger"   onclick="hangUp()">📵 Raccrocher</button>
+      </div>
+
+      <!-- Flux vidéo locaux et distants -->
+      <div id="videos">
+        <div class="video-wrap">
+          <span class="label">Toi (local)</span>
+          <!-- muted : on ne veut pas s'entendre soi-même -->
+          <video id="local-video" autoplay muted playsinline></video>
+        </div>
+        <div class="video-wrap">
+          <span class="label">Correspondant (remote)</span>
+          <video id="remote-video" autoplay playsinline></video>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- fin #app-content -->
+</div><!-- fin .container -->
+
 
 <script>
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let peer = null;
-let currentCall = null;
-let localStream = null;
-let screenStream = null;
-let micEnabled = true;
-let camEnabled = false;
-let screenEnabled = false;
-let speakerEnabled = true;
+// ================================================================
+// VARIABLES D'ÉTAT GLOBALES
+// ================================================================
+let peer          = null;   // Instance PeerJS (gère la connexion signaling)
+let currentCall   = null;   // L'appel PeerJS en cours
+let localStream   = null;   // Flux audio/vidéo local (micro + éventuellement caméra)
+let screenStream  = null;   // Flux de partage d'écran (séparé du stream local)
+let micEnabled    = true;   // État du micro (true = actif)
+let camEnabled    = false;  // État de la caméra (false = éteinte par défaut)
+let screenEnabled = false;  // État du partage d'écran
+let speakerEnabled = true;  // État du haut-parleur (true = actif)
 
-// ─── GENERATE SHORT CODE ──────────────────────────────────────────────────────
-function genCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    if (i === 3) code += '-';
-    code += chars[Math.floor(Math.random() * chars.length)];
+
+// ================================================================
+// VÉRIFICATIONS AU DÉMARRAGE
+// Appelées immédiatement quand la page se charge.
+// Si une vérification échoue, on affiche une erreur fatale
+// et on bloque l'accès à l'appli.
+// ================================================================
+function runStartupChecks() {
+
+  // ── 1. Vérification HTTPS ──────────────────────────────────────
+  // WebRTC (et donc getUserMedia pour le micro/caméra) est BLOQUÉ
+  // par les navigateurs si la page n'est pas en HTTPS.
+  // Exception : localhost est autorisé en HTTP pour le développement.
+  const isLocalhost = (
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1' ||
+    location.hostname === '[::1]'       // IPv6 localhost
+  );
+  if (location.protocol !== 'https:' && !isLocalhost) {
+    showFatalError(
+      '🔒 HTTPS requis',
+      `Cette application utilise votre micro et caméra, ce qui nécessite une connexion sécurisée.<br><br>
+      <strong>Problème :</strong> La page est chargée en <code>http://</code> au lieu de <code>https://</code>.<br><br>
+      <strong>Solution :</strong> Héberge ce fichier sur GitHub Pages ou tout autre hébergeur HTTPS.
+      L'URL doit commencer par <code>https://</code>.`
+    );
+    return false; // Arrêter les vérifications
   }
-  return code;
+
+  // ── 2. Vérification support WebRTC ────────────────────────────
+  // Vérifie que le navigateur supporte RTCPeerConnection (WebRTC).
+  // Navigateurs trop vieux ou certains browsers mobiles limités
+  // peuvent ne pas avoir cette API.
+  if (!window.RTCPeerConnection) {
+    showFatalError(
+      '🌐 Navigateur incompatible',
+      `Ton navigateur ne supporte pas WebRTC, la technologie utilisée pour les appels P2P.<br><br>
+      <strong>Solutions :</strong><br>
+      • Utilise <strong>Chrome</strong>, <strong>Firefox</strong>, <strong>Edge</strong> ou <strong>Safari</strong> récent<br>
+      • Mets à jour ton navigateur`
+    );
+    return false;
+  }
+
+  // ── 3. Vérification support getUserMedia ──────────────────────
+  // getUserMedia est l'API qui permet d'accéder au micro et à la caméra.
+  // Elle doit être disponible pour que l'appel fonctionne.
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showFatalError(
+      '🎤 Accès média impossible',
+      `Ton navigateur ne permet pas d'accéder au microphone ou à la caméra.<br><br>
+      Cela peut arriver si la page n'est pas en HTTPS, ou si le navigateur est trop ancien.<br><br>
+      <strong>Solutions :</strong><br>
+      • Assure-toi d'être en <code>https://</code><br>
+      • Utilise un navigateur récent (Chrome, Firefox, Edge, Safari)`
+    );
+    return false;
+  }
+
+  // ── 4. Vérification que PeerJS est chargé ─────────────────────
+  // PeerJS est chargé depuis unpkg.com. Si l'utilisateur est hors-ligne
+  // ou si unpkg est inaccessible, PeerJS ne sera pas disponible.
+  if (typeof Peer === 'undefined') {
+    showFatalError(
+      '📡 Librairie PeerJS non chargée',
+      `Impossible de charger la librairie PeerJS depuis internet.<br><br>
+      <strong>Cause probable :</strong> Tu n'as pas de connexion internet, ou le CDN unpkg.com est inaccessible.<br><br>
+      <strong>Solution :</strong> Vérifie ta connexion internet et recharge la page.`
+    );
+    return false;
+  }
+
+  // Toutes les vérifications passées ✅
+  return true;
 }
 
-// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+// ── Afficher une erreur fatale ─────────────────────────────────
+// Masque tout le contenu de l'appli et affiche un message d'erreur bloquant.
+function showFatalError(title, htmlMessage) {
+  document.getElementById('app-content').style.display  = 'none';
+  document.getElementById('fatal-error').style.display  = 'block';
+  document.getElementById('fatal-title').textContent     = title;
+  document.getElementById('fatal-message').innerHTML     = htmlMessage;
+}
+
+
+// ================================================================
+// GÉNÉRATION DU CODE D'APPEL COURT
+// Génère un code de 6 caractères au format "ABC-123"
+// On évite les caractères ambigus (0/O, 1/I/L)
+// ================================================================
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Pas de 0, O, 1, I, L
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    if (i === 3) code += '-'; // Tiret au milieu pour la lisibilité
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code; // Ex: "ABK-3R7"
+}
+
+
+// ================================================================
+// FONCTIONS D'INTERFACE UTILISATEUR
+// ================================================================
+
+// Affiche un panneau et cache les autres
 function showMode(mode) {
+  // Cacher tous les panneaux
   document.getElementById('main-menu').classList.add('hidden');
   document.getElementById('panel-create').classList.add('hidden');
   document.getElementById('panel-join').classList.add('hidden');
-  if (mode) document.getElementById('panel-' + mode).classList.remove('hidden');
+
+  if (mode === 'create') {
+    document.getElementById('panel-create').classList.remove('hidden');
+    initCreate(); // Démarrer le processus de création d'appel
+  } else if (mode === 'join') {
+    document.getElementById('panel-join').classList.remove('hidden');
+  } else {
+    // mode === null ou undefined → revenir au menu principal
+    document.getElementById('main-menu').classList.remove('hidden');
+  }
 }
 
+// Met à jour la barre de statut
+// type: '' (neutre), 'connected' (vert), 'error' (rouge), 'waiting' (orange), 'warning' (jaune)
 function setStatus(msg, type) {
   const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = type || '';
+  el.innerHTML  = msg;   // innerHTML pour supporter les balises HTML dans le message
+  el.className  = type || '';
 }
 
+// Copie le code d'appel dans le presse-papiers
 function copyCode() {
   const code = document.getElementById('my-code').textContent;
-  navigator.clipboard.writeText(code).then(() => setStatus('📋 Code copié !', 'waiting'));
+  if (code === '...') return; // Code pas encore généré
+
+  navigator.clipboard.writeText(code)
+    .then(() => setStatus('📋 Code copié dans le presse-papiers !', 'waiting'))
+    .catch(() => {
+      // Clipboard API peut échouer sur certains navigateurs mobiles
+      setStatus('⚠️ Copie automatique échouée — copie manuellement : <strong>' + code + '</strong>', 'warning');
+    });
 }
 
-// ─── GET LOCAL STREAM ─────────────────────────────────────────────────────────
-async function getLocalStream(video = false) {
+
+// ================================================================
+// RÉCUPÉRATION DU FLUX LOCAL (MICRO / CAMÉRA)
+// Cette fonction demande la permission d'accéder au micro (obligatoire)
+// et optionnellement à la caméra.
+// ================================================================
+async function getLocalStream(withVideo = false) {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
-  } catch(e) {
-    // Try audio only if video fails
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // Demander micro (+ caméra si demandé)
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: withVideo
+    });
+  } catch (err) {
+    // ── Analyse de l'erreur de permission ────────────────────────
+    // Les navigateurs renvoient différents types d'erreurs selon la cause.
+
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      // L'utilisateur a refusé la permission, ou elle a été bloquée dans les réglages
+      throw new Error(
+        '🎤 Permission microphone refusée.<br>' +
+        'Tu dois autoriser l\'accès au micro pour pouvoir appeler.<br>' +
+        '<strong>Comment faire :</strong> Clique sur l\'icône 🔒 ou 🎤 dans la barre d\'adresse → Autoriser le microphone.'
+      );
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      // Aucun micro détecté sur l'appareil
+      throw new Error(
+        '🎤 Aucun microphone détecté.<br>' +
+        'Branche un casque ou un micro et réessaie.'
+      );
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      // Le micro est utilisé par une autre application
+      throw new Error(
+        '🎤 Le microphone est déjà utilisé par une autre application.<br>' +
+        'Ferme les autres onglets ou applications qui utilisent le micro.'
+      );
+    } else if (err.name === 'OverconstrainedError') {
+      // Les contraintes demandées ne sont pas compatibles avec le matériel
+      // (rare, peut arriver avec des paramètres audio spécifiques)
+      throw new Error(
+        '🎤 Le microphone ne supporte pas les paramètres demandés.<br>' +
+        'Essaie avec un autre navigateur.'
+      );
+    } else if (err.name === 'SecurityError') {
+      // Permissions bloquées au niveau du navigateur ou de l'OS
+      throw new Error(
+        '🔒 Accès au microphone bloqué par les paramètres de sécurité.<br>' +
+        'Vérifie les permissions dans les réglages de ton navigateur ou de ton OS.'
+      );
+    } else {
+      // Erreur inconnue
+      throw new Error('🎤 Erreur micro : ' + err.name + ' — ' + err.message);
+    }
   }
+
+  // Afficher le flux local dans la vidéo locale (sans son pour éviter l'écho)
   document.getElementById('local-video').srcObject = localStream;
   return localStream;
 }
 
-// ─── CREATE CALL (HOST) ───────────────────────────────────────────────────────
-async function showMode_create() { showMode('create'); }
 
+// ================================================================
+// CRÉER UN APPEL (RÔLE : HÔTE)
+// L'hôte génère un code, l'affiche, et attend qu'une autre personne
+// rejoigne avec ce code.
+// ================================================================
 async function initCreate() {
-  setStatus('⏳ Connexion au serveur de signaling...');
-  const code = genCode();
-  const peerId = 'p2pcall-' + code.replace('-', '');
+  setStatus('⏳ Connexion au serveur de signaling PeerJS...');
 
-  peer = new Peer(peerId, { debug: 0 });
+  // Générer un code unique et créer l'identifiant PeerJS correspondant
+  const code   = genCode();
+  const peerId = 'p2pcall-' + code.replace('-', ''); // Ex: "p2pcallABK3R7"
 
+  try {
+    // Créer l'instance PeerJS avec l'ID dérivé du code
+    // debug: 0 = pas de logs en console (mettre 2 ou 3 pour déboguer)
+    peer = new Peer(peerId, { debug: 0 });
+  } catch (err) {
+    setStatus('❌ Impossible d\'initialiser PeerJS : ' + err.message, 'error');
+    return;
+  }
+
+  // ── Événement : connexion au serveur PeerJS établie ───────────
   peer.on('open', async (id) => {
+    // Afficher le code et attendre un correspondant
     document.getElementById('my-code').textContent = code;
     setStatus('⏳ En attente d\'un correspondant...', 'waiting');
 
-    await getLocalStream();
+    // Récupérer le stream local APRÈS la connexion PeerJS
+    // (pour ne pas demander les permissions inutilement si PeerJS échoue)
+    try {
+      await getLocalStream();
+    } catch (err) {
+      setStatus('❌ ' + err.message, 'error');
+      return;
+    }
 
+    // ── Événement : quelqu'un appelle ─────────────────────────
     peer.on('call', (call) => {
       currentCall = call;
+
+      // Répondre à l'appel avec notre stream local
       call.answer(localStream);
+
+      // Gérer les événements de l'appel (stream reçu, fermeture, erreur)
       handleCallEvents(call);
     });
   });
 
-  peer.on('error', (e) => {
-    setStatus('❌ Erreur : ' + e.message, 'error');
+  // ── Événement : erreur PeerJS ────────────────────────────────
+  peer.on('error', (err) => {
+    handlePeerError(err);
   });
 }
 
-// ─── JOIN CALL ────────────────────────────────────────────────────────────────
+
+// ================================================================
+// REJOINDRE UN APPEL (RÔLE : APPELANT)
+// L'appelant entre le code de l'hôte et se connecte à lui.
+// ================================================================
 async function joinCall() {
   const raw = document.getElementById('peer-code-input').value.trim().toUpperCase();
-  if (raw.length < 6) { setStatus('❌ Code invalide', 'error'); return; }
 
-  const peerId = 'p2pcall-' + raw.replace('-', '');
-  setStatus('⏳ Connexion...');
+  // ── Validation du code saisi ───────────────────────────────────
+  // Le code doit faire au moins 6 caractères (sans le tiret)
+  const rawClean = raw.replace('-', '');
+  if (rawClean.length < 6) {
+    setStatus('❌ Code invalide — il doit faire 6 caractères (ex: ABC-123)', 'error');
+    return;
+  }
 
-  await getLocalStream();
+  const peerId = 'p2pcall-' + rawClean; // Ex: "p2pcallABK3R7"
+  setStatus('⏳ Connexion en cours...');
 
-  peer = new Peer({ debug: 0 });
+  // Récupérer le stream local avant d'appeler
+  try {
+    await getLocalStream();
+  } catch (err) {
+    setStatus('❌ ' + err.message, 'error');
+    return;
+  }
 
+  // Créer une instance PeerJS sans ID fixe (l'ID sera généré aléatoirement)
+  try {
+    peer = new Peer({ debug: 0 });
+  } catch (err) {
+    setStatus('❌ Impossible d\'initialiser PeerJS : ' + err.message, 'error');
+    return;
+  }
+
+  // ── Événement : notre connexion PeerJS est prête ───────────────
   peer.on('open', () => {
+    // Appeler l'hôte avec son peerId et notre stream
     const call = peer.call(peerId, localStream);
+
+    if (!call) {
+      // peer.call() peut retourner null si le peerId est invalide
+      setStatus('❌ Impossible d\'initier l\'appel. Vérifie le code et réessaie.', 'error');
+      return;
+    }
+
     currentCall = call;
     handleCallEvents(call);
+
+    // Timeout : si pas de réponse au bout de 15 secondes, c'est probablement
+    // que le code est faux ou que l'hôte a fermé la page
+    setTimeout(() => {
+      if (peer && peer.open && currentCall && !document.getElementById('call-panel').classList.contains('hidden') === false) {
+        // Si on est toujours en train d'attendre (pas connecté)
+        if (document.getElementById('call-panel').classList.contains('hidden')) {
+          setStatus('⏰ Pas de réponse. Vérifie que le code est correct et que l\'autre personne attend.', 'error');
+        }
+      }
+    }, 15000);
   });
 
-  peer.on('error', (e) => {
-    setStatus('❌ Impossible de rejoindre : ' + e.type, 'error');
+  // ── Événement : erreur PeerJS ────────────────────────────────
+  peer.on('error', (err) => {
+    handlePeerError(err);
   });
 }
 
-// ─── HANDLE CALL EVENTS ───────────────────────────────────────────────────────
+
+// ================================================================
+// GESTION DES ERREURS PEERJS
+// PeerJS envoie des erreurs typées. On les traduit en messages clairs.
+// ================================================================
+function handlePeerError(err) {
+  // err.type contient le type d'erreur PeerJS
+  // err.message contient le message brut
+
+  let msg = '';
+
+  switch (err.type) {
+    case 'browser-incompatible':
+      msg = '🌐 Ton navigateur n\'est pas compatible avec WebRTC. Utilise Chrome, Firefox ou Edge.';
+      break;
+
+    case 'disconnected':
+      msg = '📡 Déconnecté du serveur de signaling. Recharge la page.';
+      break;
+
+    case 'invalid-id':
+      msg = '❌ Code d\'appel invalide. Vérifie le code et réessaie.';
+      break;
+
+    case 'invalid-key':
+      msg = '🔑 Clé API PeerJS invalide. (Erreur de configuration interne)';
+      break;
+
+    case 'network':
+      msg = '🌐 Erreur réseau. Vérifie ta connexion internet.';
+      break;
+
+    case 'peer-unavailable':
+      // Le peerId demandé n'existe pas sur le serveur PeerJS.
+      // Cause : code faux, l'hôte a fermé la page, ou le code a expiré.
+      msg = '❌ Code introuvable. Vérifie le code ou demande à l\'hôte d\'en générer un nouveau.';
+      break;
+
+    case 'ssl-unavailable':
+      msg = '🔒 Connexion SSL impossible. Vérifie que la page est en HTTPS.';
+      break;
+
+    case 'server-error':
+      msg = '🖥️ Erreur du serveur PeerJS. Réessaie dans quelques instants.';
+      break;
+
+    case 'socket-error':
+      msg = '🔌 Erreur de socket. Vérifie ta connexion internet.';
+      break;
+
+    case 'socket-closed':
+      msg = '🔌 Connexion fermée de façon inattendue. Recharge la page.';
+      break;
+
+    case 'unavailable-id':
+      // L'ID demandé est déjà utilisé sur le serveur PeerJS.
+      // Peut arriver si le même code est généré deux fois (très rare).
+      msg = '⚠️ Ce code est déjà utilisé. Clique "Créer un appel" pour en générer un nouveau.';
+      break;
+
+    case 'webrtc':
+      msg = '📡 Erreur WebRTC : ' + err.message + '. Vérifie ta connexion réseau.';
+      break;
+
+    default:
+      msg = '❌ Erreur inconnue (' + (err.type || 'unknown') + ') : ' + err.message;
+  }
+
+  setStatus(msg, 'error');
+}
+
+
+// ================================================================
+// GESTION DES ÉVÉNEMENTS D'UN APPEL PEERJS
+// Cette fonction est appelée aussi bien côté hôte que côté appelant.
+// ================================================================
 function handleCallEvents(call) {
+
+  // ── Événement : stream distant reçu ───────────────────────────
+  // Cet événement se déclenche quand on reçoit le flux audio/vidéo
+  // de l'autre personne. C'est le signal que la connexion est établie.
   call.on('stream', (remoteStream) => {
     document.getElementById('remote-video').srcObject = remoteStream;
     setStatus('✅ Connecté !', 'connected');
+
+    // Afficher le panneau d'appel et cacher les autres
     document.getElementById('call-panel').classList.remove('hidden');
-    showMode(null);
+    showMode(null); // Cacher menu et panneaux de connexion
   });
 
+  // ── Événement : appel fermé par l'autre personne ───────────────
   call.on('close', () => {
-    setStatus('📵 Appel terminé', 'error');
-    document.getElementById('call-panel').classList.add('hidden');
-    showMode(null);
-    document.getElementById('main-menu').classList.remove('hidden');
+    setStatus('📵 L\'autre personne a raccroché.', 'error');
+    resetAfterCall();
   });
 
-  call.on('error', (e) => {
-    setStatus('❌ Erreur appel : ' + e.message, 'error');
+  // ── Événement : erreur pendant l'appel ────────────────────────
+  call.on('error', (err) => {
+    setStatus('❌ Erreur pendant l\'appel : ' + err.message, 'error');
+    resetAfterCall();
   });
 }
 
-// ─── SHOW MODE OVERRIDE ───────────────────────────────────────────────────────
-// Override showMode to auto-init create
-const _originalShowMode = showMode;
-function showMode(mode) {
-  document.getElementById('main-menu').classList.add('hidden');
-  document.getElementById('panel-create').classList.add('hidden');
-  document.getElementById('panel-join').classList.add('hidden');
-  if (mode === 'create') {
-    document.getElementById('panel-create').classList.remove('hidden');
-    initCreate();
-  } else if (mode === 'join') {
-    document.getElementById('panel-join').classList.remove('hidden');
-  } else if (mode === null) {
-    document.getElementById('main-menu').classList.remove('hidden');
-  }
-}
 
-// ─── MEDIA CONTROLS ──────────────────────────────────────────────────────────
+// ================================================================
+// CONTRÔLES MÉDIA PENDANT L'APPEL
+// ================================================================
+
+// ── Micro : activer / couper ────────────────────────────────────
 function toggleMic() {
   micEnabled = !micEnabled;
-  if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+
+  // Activer/désactiver les pistes audio du stream local
+  if (localStream) {
+    localStream.getAudioTracks().forEach(track => {
+      track.enabled = micEnabled;
+    });
+  }
+
   document.getElementById('btn-mic').textContent = '🎤 Micro : ' + (micEnabled ? 'ON' : 'OFF');
 }
 
+// ── Caméra : activer / désactiver ──────────────────────────────
 async function toggleCam() {
   if (!camEnabled) {
+    // ── Activer la caméra ─────────────────────────────────────
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true });
-      const track = s.getVideoTracks()[0];
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const track = camStream.getVideoTracks()[0];
+
+      // Ajouter la piste vidéo au stream local
       localStream.addTrack(track);
+
+      // Ajouter la piste à la connexion P2P en cours (si elle existe)
       if (currentCall && currentCall.peerConnection) {
         currentCall.peerConnection.addTrack(track, localStream);
       }
+
+      // Mettre à jour la vidéo locale pour montrer la caméra
       document.getElementById('local-video').srcObject = localStream;
       camEnabled = true;
-    } catch(e) { alert('Impossible d\'accéder à la caméra'); return; }
+
+    } catch (err) {
+      // Traitement spécifique des erreurs caméra
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setStatus('📷 Permission caméra refusée. Autorise l\'accès dans les réglages du navigateur.', 'error');
+      } else if (err.name === 'NotFoundError') {
+        setStatus('📷 Aucune caméra détectée sur cet appareil.', 'error');
+      } else if (err.name === 'NotReadableError') {
+        setStatus('📷 La caméra est déjà utilisée par une autre application.', 'error');
+      } else {
+        setStatus('📷 Erreur caméra : ' + err.name, 'error');
+      }
+      return; // Ne pas changer l'état si erreur
+    }
+
   } else {
-    localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+    // ── Désactiver la caméra ──────────────────────────────────
+    // Arrêter et supprimer toutes les pistes vidéo du stream local
+    localStream.getVideoTracks().forEach(track => {
+      track.stop();             // Libérer la caméra (éteint le voyant)
+      localStream.removeTrack(track);
+    });
     camEnabled = false;
   }
+
   document.getElementById('btn-cam').textContent = '📷 Caméra : ' + (camEnabled ? 'ON' : 'OFF');
 }
 
+// ── Partage d'écran : activer / désactiver ─────────────────────
 async function toggleScreen() {
   if (!screenEnabled) {
+    // ── Démarrer le partage d'écran ───────────────────────────
     try {
-      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      const track = screenStream.getVideoTracks()[0];
+      // getDisplayMedia ouvre la fenêtre de sélection d'écran du navigateur
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true  // Tenter de capturer l'audio système (pas toujours supporté)
+      });
+
+      const videoTrack = screenStream.getVideoTracks()[0];
+
+      // Ajouter ou remplacer la piste vidéo dans la connexion P2P
       if (currentCall && currentCall.peerConnection) {
         const senders = currentCall.peerConnection.getSenders();
-        const vs = senders.find(s => s.track && s.track.kind === 'video');
-        if (vs) vs.replaceTrack(track);
-        else currentCall.peerConnection.addTrack(track, localStream);
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+
+        if (videoSender) {
+          // Remplacer la vidéo existante (caméra) par le partage d'écran
+          videoSender.replaceTrack(videoTrack);
+        } else {
+          // Pas de vidéo existante, en ajouter une nouvelle
+          currentCall.peerConnection.addTrack(videoTrack, localStream);
+        }
       }
+
+      // Afficher le partage d'écran dans la vidéo locale
       document.getElementById('local-video').srcObject = screenStream;
       screenEnabled = true;
-      track.onended = () => {
+
+      // ── Gérer l'arrêt natif du partage d'écran ────────────────
+      // Quand l'utilisateur clique "Arrêter le partage" dans la barre du navigateur,
+      // cet événement est déclenché automatiquement.
+      videoTrack.addEventListener('ended', () => {
         screenEnabled = false;
+        screenStream = null;
         document.getElementById('btn-screen').textContent = '🖥️ Écran : OFF';
+        // Remettre le flux local (caméra ou vide) dans la vidéo locale
         document.getElementById('local-video').srcObject = localStream;
-      };
-    } catch(e) { return; }
+      });
+
+    } catch (err) {
+      // L'utilisateur a annulé la sélection d'écran → pas d'erreur à afficher
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setStatus('🖥️ Partage d\'écran refusé ou annulé.', 'warning');
+      } else if (err.name === 'NotSupportedError') {
+        setStatus('🖥️ Le partage d\'écran n\'est pas supporté par ce navigateur.', 'error');
+      } else if (err.name !== 'AbortError') {
+        // AbortError = annulation volontaire, on ne l'affiche pas
+        setStatus('🖥️ Erreur partage d\'écran : ' + err.name, 'error');
+      }
+      return; // Ne pas changer l'état
+    }
+
   } else {
-    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    // ── Arrêter le partage d'écran ────────────────────────────
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      screenStream = null;
+    }
     screenEnabled = false;
+
+    // Remettre le flux local dans la vidéo locale
     document.getElementById('local-video').srcObject = localStream;
   }
+
   document.getElementById('btn-screen').textContent = '🖥️ Écran : ' + (screenEnabled ? 'ON' : 'OFF');
 }
 
+// ── Haut-parleur : activer / couper ────────────────────────────
 function toggleSpeaker() {
   speakerEnabled = !speakerEnabled;
+
+  // Muter/démuter la vidéo distante (qui contient l'audio du correspondant)
   document.getElementById('remote-video').muted = !speakerEnabled;
+
   document.getElementById('btn-speaker').textContent = '🔊 Son : ' + (speakerEnabled ? 'ON' : 'OFF');
 }
 
+
+// ================================================================
+// RACCROCHER
+// Ferme l'appel, libère tous les médias, et réinitialise l'interface.
+// ================================================================
 function hangUp() {
-  if (currentCall) { currentCall.close(); currentCall = null; }
-  if (peer) { peer.destroy(); peer = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-  document.getElementById('call-panel').classList.add('hidden');
-  document.getElementById('main-menu').classList.remove('hidden');
-  document.getElementById('peer-code-input').value = '';
-  micEnabled = true; camEnabled = false; screenEnabled = false; speakerEnabled = true;
-  setStatus('Appel terminé');
+  // Fermer l'appel P2P proprement
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
+  }
+
+  // Déconnecter du serveur PeerJS
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+
+  // Libérer le micro et la caméra (éteint les voyants)
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+
+  // Libérer le partage d'écran
+  if (screenStream) {
+    screenStream.getTracks().forEach(track => track.stop());
+    screenStream = null;
+  }
+
+  setStatus('📵 Appel terminé.');
+  resetAfterCall();
 }
+
+// ── Réinitialiser l'interface après un appel ───────────────────
+// Remet tout à zéro pour pouvoir relancer un appel.
+function resetAfterCall() {
+  // Cacher le panneau d'appel
+  document.getElementById('call-panel').classList.add('hidden');
+
+  // Remettre l'affichage au menu principal
+  document.getElementById('main-menu').classList.remove('hidden');
+  document.getElementById('panel-create').classList.add('hidden');
+  document.getElementById('panel-join').classList.add('hidden');
+
+  // Remettre le code à entrer vide
+  document.getElementById('peer-code-input').value = '';
+
+  // Remettre le code affiché à "..."
+  document.getElementById('my-code').textContent = '...';
+
+  // Réinitialiser les états des boutons de contrôle
+  micEnabled     = true;
+  camEnabled     = false;
+  screenEnabled  = false;
+  speakerEnabled = true;
+  document.getElementById('btn-mic').textContent     = '🎤 Micro : ON';
+  document.getElementById('btn-cam').textContent     = '📷 Caméra : OFF';
+  document.getElementById('btn-screen').textContent  = '🖥️ Écran : OFF';
+  document.getElementById('btn-speaker').textContent = '🔊 Son : ON';
+
+  // Vider les flux vidéo
+  document.getElementById('local-video').srcObject  = null;
+  document.getElementById('remote-video').srcObject = null;
+}
+
+
+// ================================================================
+// POINT D'ENTRÉE : exécuté au chargement de la page
+// ================================================================
+(function init() {
+  // Lancer les vérifications de démarrage.
+  // Si une vérification échoue, showFatalError() est appelé
+  // et l'appli est bloquée.
+  const ok = runStartupChecks();
+  if (!ok) return; // Arrêter ici si erreur critique
+
+  // Tout est bon, l'appli est prête
+  setStatus('✅ Prêt — crée ou rejoins un appel.');
+})();
+
 </script>
 </body>
 </html>
